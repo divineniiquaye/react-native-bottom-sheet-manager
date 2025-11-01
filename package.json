@@ -1,6 +1,6 @@
 {
   "name": "@niibase/bottom-sheet-manager",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "A bottom sheet manager for react-native based on @gorhom/bottom-sheet",
   "main": "lib/commonjs/index",
   "module": "lib/module/index",
