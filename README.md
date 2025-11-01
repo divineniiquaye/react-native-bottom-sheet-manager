@@ -93,7 +93,7 @@ import {
   BottomSheetNavigationOptions,
   BottomSheetNavigationEventMap,
   BottomSheetNavigationState,
-} from "@repo/bottom-sheet";
+} from "@niibase/bottom-sheet-manager";
 import { Slot, withLayoutContext } from "expo-router";
 
 const { Navigator } = createBottomSheetNavigator();
@@ -141,7 +141,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 **Built with ❤️ by [@divineniiquaye](https://github.com/divineniiquaye) using React Native and [@gorhom/bottom-sheet](https://github.com/gorhom/react-native-bottom-sheet).**
 
-[⬆ Back to Top](#-installation)
+[⬆ Back to Top](#installation)
 
 </div>
 
