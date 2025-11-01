@@ -1,0 +1,39 @@
+{
+  "git": {
+    "push": true,
+    "tagName": "v${version}",
+    "commitMessage": "chore: release v${version}"
+  },
+  "github": {
+    "release": true
+  },
+  "npm": {
+    "publish": true
+  },
+  "plugins": {
+    "@release-it/conventional-changelog": {
+      "preset": {
+        "name": "conventionalcommits",
+        "types": [
+          {
+            "type": "feat",
+            "section": "🚀 New Features"
+          },
+          {
+            "type": "fix",
+            "section": "🐛 Bug Fixes"
+          },
+          {
+            "type": "chore",
+            "section": "🧹 Maintenance Chores"
+          },
+          {
+            "type": "refactor",
+            "section": "♻️ Code Refactor"
+          }
+        ]
+      },
+      "infile": "CHANGELOG.md"
+    }
+  }
+}

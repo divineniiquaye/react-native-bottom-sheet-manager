@@ -1,0 +1,27 @@
+{
+  "name": "BottomSheet Manager",
+  "slug": "BottomSheet",
+  "description": "Example app for react-native-bottom-sheet-manager",
+  "privacy": "public",
+  "scheme": "bottomsheetmanager",
+  "version": "1.0.0",
+  "userInterfaceStyle": "automatic",
+  "backgroundColor": "#000000",
+  "newArchEnabled": true,
+  "platforms": [
+    "ios",
+    "android",
+    "web"
+  ],
+  "ios": {
+    "supportsTablet": true,
+    "bundleIdentifier": "dev.niibase.bottomsheetmanager"
+  },
+  "android": {
+    "package": "dev.niibase.bottomsheetmanager",
+    "softwareKeyboardLayoutMode": "pan"
+  },
+  "assetBundlePatterns": [
+    "**/*"
+  ]
+}

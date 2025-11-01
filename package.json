@@ -1,0 +1,102 @@
+{
+  "name": "@niibase/bottom-sheet-manager",
+  "version": "1.0.0",
+  "description": "A bottom sheet manager for react-native based on @gorhom/bottom-sheet",
+  "main": "lib/commonjs/index",
+  "module": "lib/module/index",
+  "types": "lib/typescript/index.d.ts",
+  "react-native": "src/index.ts",
+  "source": "src/index.ts",
+  "scripts": {
+    "typescript": "tsc --skipLibCheck --noEmit",
+    "lint": "prettier --check \"src/**/*\" \"example/**/*\"",
+    "format": "prettier --write \"src/**/*\" \"example/**/*\"",
+    "build": "bob build && yarn copy-dts && yarn delete-dts.js",
+    "copy-dts": "copyfiles -u 1 \"src/**/*.d.ts\" lib/typescript",
+    "delete-dts.js": "find ./lib/commonjs -name '*.d.js*' -delete && find ./lib/module -name '*.d.js*' -delete",
+    "release": "rm -rf lib && yarn build && release-it",
+    "example": "yarn --cwd example",
+    "bootstrap": "yarn install && yarn example"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/divineniiquaye/react-native-bottom-sheet-manager.git"
+  },
+  "keywords": [
+    "react-native",
+    "ios",
+    "android",
+    "web",
+    "bottom-sheet-manager",
+    "bottom-sheet",
+    "bottomsheet",
+    "reanimated",
+    "sheet"
+  ],
+  "author": "Divine Niiquaye Ibok",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/divineniiquaye/react-native-bottom-sheet-manager/issues"
+  },
+  "homepage": "https://github.com/divineniiquaye/react-native-bottom-sheet-manager#readme",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "files": [
+    "src",
+    "lib",
+    "LICENSE"
+  ],
+  "peerDependencies": {
+    "@react-navigation/native": ">=6.0.0 || >=7.0.0-",
+    "@types/react": "*",
+    "@types/react-native": "*",
+    "react": "*",
+    "react-native": "*",
+    "react-native-gesture-handler": ">=2.16.1",
+    "react-native-reanimated": ">=3.16.0 || >=4.0.0-",
+    "react-native-safe-area-context": "*"
+  },
+  "peerDependenciesMeta": {
+    "@types/react-native": {
+      "optional": true
+    },
+    "@types/react": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@gorhom/bottom-sheet": "^5.2.6",
+    "nanoid": "^5.1.6"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
+    "@ianvs/prettier-plugin-sort-imports": "file:patched/prettier-plugin-sort-imports",
+    "@react-navigation/native": "^7.1.9",
+    "@release-it/conventional-changelog": "^10.0.1",
+    "@types/react": "~18.3.12",
+    "@types/react-native": "~0.73.0",
+    "copyfiles": "^2.4.1",
+    "metro-react-native-babel-preset": "^0.77.0",
+    "prettier": "3.6.2",
+    "react": "18.3.1",
+    "react-native": "0.76.0",
+    "react-native-builder-bob": "^0.23.2",
+    "react-native-gesture-handler": "~2.20.2",
+    "react-native-reanimated": "~3.19.1",
+    "react-native-safe-area-context": "~5.6.0",
+    "release-it": "^19.0.4",
+    "typescript": "^5.8.3"
+  },
+  "react-native-builder-bob": {
+    "source": "src",
+    "output": "lib",
+    "targets": [
+      "commonjs",
+      "module",
+      "typescript"
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    "esbenp.prettier-vscode",
+    "christian-kohler.path-intellisense",
+    "EditorConfig.EditorConfig",
+    "christian-kohler.npm-intellisense"
+  ]
+}
