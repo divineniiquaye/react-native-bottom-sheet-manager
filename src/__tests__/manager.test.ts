@@ -1,6 +1,10 @@
+import type { FC, ElementType } from "react";
+
+const TestSheet: FC = () => null;
+
 jest.mock("../provider", () => {
   const providerRegistryStack: string[] = [];
-  const sheetsRegistry: Record<string, Record<string, unknown>> = {
+  const sheetsRegistry: Record<string, Record<string, ElementType>> = {
     global: {},
   };
   return { providerRegistryStack, sheetsRegistry };
@@ -89,7 +93,7 @@ describe("SheetManager", () => {
 
   it("publishes show events and resolves when the sheet closes", async () => {
     const { SheetManager, sheetsRegistry, eventManager } = setup();
-    sheetsRegistry.global["test-sheet"] = {};
+    sheetsRegistry.global["test-sheet"] = TestSheet;
 
     const onClose = jest.fn();
     const promise = SheetManager.show("test-sheet", { onClose });
@@ -107,7 +111,7 @@ describe("SheetManager", () => {
 
   it("publishes hide events with the provided context", async () => {
     const { SheetManager, PrivateManager, sheetsRegistry, eventManager } = setup();
-    sheetsRegistry.global["test-sheet"] = {};
+    sheetsRegistry.global["test-sheet"] = TestSheet;
     PrivateManager.add("test-sheet", "global");
 
     const promise = SheetManager.hide("test-sheet", {

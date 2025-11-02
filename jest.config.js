@@ -13,4 +13,5 @@ module.exports = {
     "^@niibase/bottom-sheet-manager(?:/(.*))?$": "<rootDir>/src/$1",
   },
   clearMocks: true,
+  watchman: false,
 };
