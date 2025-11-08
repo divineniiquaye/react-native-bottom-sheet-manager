@@ -8,7 +8,7 @@ registerSheet("example-sheet", ExampleSheet);
 // across the app for all registered sheets.
 declare module "@niibase/bottom-sheet-manager" {
     interface Sheets {
-        "example-sheet": SheetDefinition;
+        "example-sheet": SheetDefinition<undefined, number>;
     }
 }
 

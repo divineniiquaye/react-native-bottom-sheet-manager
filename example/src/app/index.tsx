@@ -1,4 +1,4 @@
-import { Pressable, StatusBar, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StatusBar, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { SheetManager } from "@niibase/bottom-sheet-manager";
@@ -11,7 +11,15 @@ export default function Screen() {
       <View style={styles.buttonContainer}>
         <Pressable
           style={({ pressed }) => [styles.button, pressed ? styles.buttonPressed : null]}
-          onPress={() => SheetManager.show("example-sheet")}
+          onPress={async () => {
+            const result = await SheetManager.show("example-sheet");
+            if (typeof result === "number") {
+              Alert.alert(
+                "Result from Sheet Manager",
+                `Sheet Closed at index: ${result}`,
+              );
+            }
+          }}
         >
           <Text style={styles.buttonText}>Example</Text>
         </Pressable>

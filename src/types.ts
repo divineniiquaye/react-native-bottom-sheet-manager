@@ -104,9 +104,10 @@ export type BottomSheetProps = Omit<
     /**
      * Callback when the sheet close.
      *
-     * @type () => void;
+     * @type () => any;
+     * @returns The data returned by the sheet to be returned when closed.
      */
-    onClose?: (data?: any) => void;
+    onClose?: (data?: any) => any;
 
     /**
      * Event called before sheets is visible.

@@ -195,12 +195,13 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
 
     const hideSheet = React.useCallback(
       (data?: any, isSheetManagerOrRef?: boolean, dismiss?: boolean) => {
-        const value = data ?? valueRef.current;
+        let value = data ?? valueRef.current;
 
         if (!dismiss || stackBehavior !== "push") {
           hardwareBackPressEvent.current?.remove();
           bottomSheetRef.current?.close();
-          onClose?.(value);
+          const closeValue = onClose?.(value);
+          if (undefined !== closeValue) value = closeValue;
         }
 
         if (sheetId) {

@@ -39,6 +39,7 @@ export default function ExampleSheet({ id }: SheetProps<"example-sheet">) {
       containerStyle={styles.bottomSheet}
       snapPoints={["60%", "100%"]}
       onChange={(index) => setExpand(index === 1)}
+      onClose={() => (expand ? 2 : 1)}
     >
       <BottomSheet.View style={styles.content}>
         <View style={styles.gap}>
