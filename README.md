@@ -210,6 +210,31 @@ function MySheet() {
 }
 ```
 
+### Known Limitations
+
+**⚠️ Important:** When using the bottom sheet as a navigator, calling `BottomSheet.Screen` from the `Navigator` will cause the sheet to render immediately.
+
+To customize the sheet screen options (e.g., change `snapPoints`), you must do it within the screen component itself using `navigation.setOptions()`:
+
+```tsx
+import { useBottomSheetNavigation } from "@niibase/bottom-sheet-manager";
+import { useEffect } from "react";
+
+export default function ProfileSheet() {
+  const navigation = useBottomSheetNavigation();
+
+  useEffect(() => {
+    navigation.setOptions({ snapPoints: ["100%"] });
+  }, [navigation]);
+
+  return (
+    // Your sheet content
+  );
+}
+```
+
+This ensures that the sheet options are set after the component mounts, allowing you to customize the behavior per screen.
+
 ## Hooks
 
 ### `useBottomSheetNavigation`
