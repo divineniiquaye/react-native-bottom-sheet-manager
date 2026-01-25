@@ -26,18 +26,18 @@ export default function ExampleSheet({ id }: SheetProps<"example-sheet">) {
   }));
 
   React.useEffect(() => {
-    pulse.value = withRepeat(
-      withTiming(4 * Math.PI, { duration: 2000, easing: Easing.linear }),
+    pulse.set(
+      withRepeat(withTiming(4 * Math.PI, { duration: 2000, easing: Easing.linear })),
     );
   }, []);
 
   return (
     <BottomSheet
       id={id}
-      handleStyle={styles.handler}
       iosModalSheetTypeOfAnimation
       containerStyle={styles.bottomSheet}
-      snapPoints={["60%", "100%"]}
+      enablePanDownToClose={true}
+      snapPoints={["60%", "90%", "100%"]}
       onChange={(index) => setExpand(index === 1)}
       onClose={() => (expand ? 2 : 1)}
     >
@@ -83,9 +83,6 @@ export default function ExampleSheet({ id }: SheetProps<"example-sheet">) {
 
 const styles = StyleSheet.create({
   bottomSheet: {
-    borderRadius: 24,
-  },
-  handler: {
     borderRadius: 24,
   },
   content: {

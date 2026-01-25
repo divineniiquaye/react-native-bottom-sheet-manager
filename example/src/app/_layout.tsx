@@ -1,19 +1,22 @@
-import { SafeAreaProvider, SafeAreaView } from "react-native-safe-area-context";
-import { Slot } from "expo-router";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { ThemeProvider, DefaultTheme } from "@react-navigation/native";
+import { Stack } from "expo-router";
+import React from "react";
 
 import { SheetProvider } from "@niibase/bottom-sheet-manager";
 
 import "../sheets";
 
-import { GestureHandlerRootView } from "react-native-gesture-handler";
-
-export default function App() {
+export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <SheetProvider>
-          <Slot />
-        </SheetProvider>
+        <ThemeProvider value={DefaultTheme}>
+          <SheetProvider>
+            <Stack screenOptions={{ headerShown: false }} />
+          </SheetProvider>
+        </ThemeProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );
