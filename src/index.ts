@@ -3,9 +3,10 @@ export { SheetManager } from "./manager";
 export * from "./router";
 export * from "./types";
 export {
-    SheetProvider,
-    useSheetPayload,
-    useSheetRef,
-    useOnSheet,
-    registerSheet,
+  SheetProvider,
+  useSheetPayload,
+  useSheetRef,
+  useOnSheet,
+  useStackBehaviorContext,
+  registerSheet,
 } from "./provider";
