@@ -1,14 +1,13 @@
 import {
   createNavigatorFactory,
-  NavigatorTypeBagBase,
-  ParamListBase,
-  StaticConfig,
-  TypedNavigator,
   useNavigationBuilder,
+  type NavigatorTypeBagBase,
+  type ParamListBase,
+  type StaticConfig,
+  type TypedNavigator,
 } from "@react-navigation/native";
-import React from "react";
+import * as React from "react";
 
-import { BottomSheetRouter, BottomSheetRouterOptions } from "./router";
 import type {
   BottomSheetActionHelpers,
   BottomSheetNavigationEventMap,
@@ -17,6 +16,7 @@ import type {
   BottomSheetNavigationState,
   BottomSheetNavigatorProps,
 } from "./types";
+import { BottomSheetRouter, type BottomSheetRouterOptions } from "./router";
 import { BottomSheetView } from "./view";
 
 function BottomSheetNavigator({
@@ -24,6 +24,7 @@ function BottomSheetNavigator({
   children,
   screenListeners,
   screenOptions,
+  initialRouteName,
   ...rest
 }: BottomSheetNavigatorProps) {
   const { state, descriptors, navigation, NavigationContent } = useNavigationBuilder<
@@ -37,6 +38,7 @@ function BottomSheetNavigator({
     children,
     screenListeners,
     screenOptions,
+    initialRouteName,
   });
 
   return (
@@ -52,18 +54,40 @@ function BottomSheetNavigator({
 }
 
 /**
- * To use BottomSheetNavigator with expo-router, the first screen should be your app content
- * and add a border radius of 24px to the root view if want to snap to 100%.
+ * Creates a bottom sheet navigator that renders screens as bottom sheet modals.
+ *
+ * The first screen in the navigator is rendered as the main content,
+ * and subsequent screens are rendered as bottom sheet modals on top.
  *
  * @example
  * ```tsx
+ * // With React Navigation
+ * const { Navigator, Screen } = createBottomSheetNavigator();
+ *
+ * function App() {
+ *   return (
+ *     <Navigator>
+ *       <Screen name="Home" component={HomeScreen} />
+ *       <Screen
+ *         name="Details"
+ *         component={DetailsSheet}
+ *         options={{ snapPoints: ['50%', '100%'] }}
+ *       />
+ *     </Navigator>
+ *   );
+ * }
+ * ```
+ *
+ * @example
+ * ```tsx
+ * // With Expo Router
+ * import { Slot, withLayoutContext } from "expo-router";
  * import {
  *   createBottomSheetNavigator,
  *   BottomSheetNavigationOptions,
  *   BottomSheetNavigationEventMap,
  *   BottomSheetNavigationState,
- * } from "@repo/bottom-sheet";
- * import { Slot, withLayoutContext } from "expo-router";
+ * } from "@niibase/bottom-sheet-manager";
  *
  * const { Navigator } = createBottomSheetNavigator();
  *
@@ -79,36 +103,22 @@ function BottomSheetNavigator({
  * };
  *
  * export default function Layout() {
+ *   // SSR guard - navigator doesn't work on server
  *   if (typeof window === "undefined") return <Slot />;
- *   return (
- *     <BottomSheet
- *       screenOptions={
- *         {
- *           // API Reference: `@repo/design/bottom-sheet/types.ts`
- *           // And: https://gorhom.github.io/react-native-bottom-sheet/modal/props/
- *         }
- *       }
- *.    />
- *   );
+ *
+ *   return <BottomSheet />;
  * }
  * ```
  */
 export function createBottomSheetNavigator<
   const ParamList extends ParamListBase,
   const NavigatorID extends string | undefined = undefined,
-  // We'll define a type bag specialized for bottom sheets:
   const TypeBag extends NavigatorTypeBagBase = {
-    // The param list from the user
     ParamList: ParamList;
-    // Optional ID for this navigator
     NavigatorID: NavigatorID;
-    // The state shape
     State: BottomSheetNavigationState<ParamList>;
-    // The screen options
     ScreenOptions: BottomSheetNavigationOptions;
-    // The event map
     EventMap: BottomSheetNavigationEventMap;
-    // The type of the "navigation" object used by each screen in the navigator
     NavigationList: {
       [RouteName in keyof ParamList]: BottomSheetNavigationProp<
         ParamList,
@@ -116,15 +126,12 @@ export function createBottomSheetNavigator<
         NavigatorID
       >;
     };
-    // The navigator component
     Navigator: typeof BottomSheetNavigator;
   },
-  // The static config allows for "static" route config
   const Config extends StaticConfig<TypeBag> = StaticConfig<TypeBag>,
 >(config?: Config): TypedNavigator<TypeBag, Config> {
-  // We call `createNavigatorFactory` with our un-typed navigator
-  // but pass in the config to get the typed container
   return createNavigatorFactory(BottomSheetNavigator)(config);
 }
 
 export * from "./types";
+export { BottomSheetActions, useBottomSheetNavigation } from "./router";

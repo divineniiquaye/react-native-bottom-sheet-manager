@@ -1,70 +1,182 @@
-import {
-  BottomSheetBackdrop,
-  BottomSheetModal,
-  BottomSheetModalProps,
-  BottomSheetModalProvider,
-} from "@gorhom/bottom-sheet";
-import { ParamListBase, useTheme } from "@react-navigation/native";
-import * as React from "react";
-import { StatusBar } from "react-native";
 import Animated, {
   Easing,
   interpolate,
   interpolateColor,
   runOnJS,
+  SharedValue,
   useAnimatedReaction,
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
 } from "react-native-reanimated";
+import {
+  BottomSheetBackdrop,
+  BottomSheetModal,
+  BottomSheetModalProvider,
+} from "@gorhom/bottom-sheet";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { ParamListBase, useTheme } from "@react-navigation/native";
+import { StatusBar, ViewStyle } from "react-native";
+import * as React from "react";
 
 import type {
+  BottomSheetDescriptor,
   BottomSheetDescriptorMap,
+  BottomSheetModalScreenProps,
   BottomSheetNavigationConfig,
   BottomSheetNavigationHelpers,
-  BottomSheetNavigationProp,
   BottomSheetNavigationState,
+  BottomSheetRoute,
 } from "./types";
+import { BottomSheetActions } from "./router";
 
-type BottomSheetModalScreenProps = BottomSheetModalProps & {
-  navigation: BottomSheetNavigationProp<ParamListBase>;
-  /**
-   * When `true`, tapping on the backdrop will not dismiss the modal.
-   * @default false
-   */
-  clickThrough?: boolean;
+const DEFAULT_SNAP_POINTS = ["66%"];
 
-  /**
-   * Opacity of the sheet's overlay.
-   * @default 0.45
-   */
-  opacity?: number;
+function AnimatedSheetWrapper({
+  route,
+  navigation,
+  descriptor,
+  isFullScreen,
+  previousIndex,
+  defaultStyle,
+  themeBackgroundStyle,
+  themeHandleIndicatorStyle,
+}: {
+  route: BottomSheetRoute<ParamListBase>;
+  navigation: BottomSheetNavigationHelpers;
+  descriptor: BottomSheetDescriptor;
+  isFullScreen: SharedValue<number>;
+  previousIndex: SharedValue<number>;
+  defaultStyle: ViewStyle;
+  themeBackgroundStyle: ViewStyle;
+  themeHandleIndicatorStyle: ViewStyle;
+}) {
+  const { options, render } = descriptor;
+  const {
+    index = 0,
+    snapPoints = DEFAULT_SNAP_POINTS,
+    animatedIndex: defaultAnimatedIndex,
+    onAnimate,
+    handleStyle,
+    backgroundStyle,
+    handleIndicatorStyle,
+    enableDynamicSizing,
+    iosModalSheetTypeOfAnimation,
+    clickThrough,
+    style,
+    ...sheetProps
+  } = options;
 
-  /**
-   * IOS modal sheet type of animation
-   * @default false
-   */
-  iosModalSheetTypeOfAnimation?: boolean;
-};
+  // Calculate safe index
+  const safeIndex = Math.min(route.snapToIndex ?? index, snapPoints.length - 1);
+
+  // Create animatedIndex for this sheet
+  const animatedIndex = useSharedValue(0);
+
+  // Use animated reaction to watch animatedIndex and update isFullScreen reactively
+  useAnimatedReaction(
+    () => animatedIndex.value,
+    (index) => {
+      "worklet";
+      if (defaultAnimatedIndex) {
+        defaultAnimatedIndex.set(index);
+      }
+
+      if (!iosModalSheetTypeOfAnimation) {
+        if (isFullScreen.value > 0) isFullScreen.set(0);
+        previousIndex.set(index);
+        return;
+      }
+
+      if (isFullScreen.value < 0) {
+        isFullScreen.set(0);
+      }
+
+      const isClosing =
+        index < 0 || (previousIndex.value >= 0 && index < previousIndex.value - 0.05);
+      previousIndex.set(index);
+
+      if (isClosing) {
+        if (isFullScreen.value > 0.01) {
+          isFullScreen.set(
+            withTiming(0, {
+              duration: 150 * 0.85,
+              easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+            }),
+          );
+        }
+        return;
+      }
+
+      const points: (string | number)[] = ["%90", "90%"];
+      const fullScreenIndex = snapPoints.findIndex((p: string | number) =>
+        points.includes(p),
+      );
+
+      if (index >= fullScreenIndex - 0.5 && index <= fullScreenIndex + 0.5) {
+        isFullScreen.set(1);
+      } else if (index >= 0) {
+        isFullScreen.set(0);
+      }
+    },
+    [snapPoints, iosModalSheetTypeOfAnimation],
+  );
+
+  return (
+    <BottomSheetModalScreen
+      route={route}
+      navigation={navigation}
+      index={safeIndex}
+      snapPoints={enableDynamicSizing ? undefined : snapPoints}
+      enableDynamicSizing={enableDynamicSizing}
+      animatedIndex={animatedIndex as any}
+      clickThrough={clickThrough}
+      animationConfigs={{
+        duration: 300,
+        easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+      }}
+      onAnimate={(from, to, ...args) => {
+        if (to >= isFullScreen.value && to > snapPoints.length - 1) {
+          isFullScreen.set(0);
+        } else if (to > 0 && to === previousIndex.value && isFullScreen.value === 0) {
+          isFullScreen.set(1);
+        }
+
+        onAnimate?.(from, to, ...args);
+      }}
+      topInset={0}
+      bottomInset={0}
+      style={[defaultStyle, style]}
+      backgroundStyle={[themeBackgroundStyle, backgroundStyle]}
+      handleIndicatorStyle={[themeHandleIndicatorStyle, handleIndicatorStyle]}
+      handleStyle={[themeBackgroundStyle, { borderRadius: 24 }, handleStyle]}
+      {...sheetProps}
+    >
+      {render?.()}
+    </BottomSheetModalScreen>
+  );
+}
 
 function BottomSheetModalScreen({
-  index,
+  route,
   navigation,
   clickThrough,
-  iosModalSheetTypeOfAnimation,
   opacity,
+  animatedIndex,
+  onChange,
   children,
   ...props
-}: BottomSheetModalScreenProps) {
+}: BottomSheetModalScreenProps & { animatedIndex?: ReturnType<typeof useSharedValue> }) {
   const ref = React.useRef<BottomSheetModal>(null);
-  const lastIndexRef = React.useRef(index);
+  const lastSnapIndexRef = React.useRef(route.snapToIndex ?? props.index ?? 0);
 
   // Present on mount.
   React.useEffect(() => {
     ref.current?.present();
   }, []);
 
+  // Track mount state to avoid dismissing on unmount
   const isMounted = React.useRef(true);
   React.useEffect(() => {
     return () => {
@@ -72,54 +184,66 @@ function BottomSheetModalScreen({
     };
   }, []);
 
+  // Handle route closing state
   React.useEffect(() => {
-    if (index != null && lastIndexRef.current !== index) {
-      ref.current?.snapToIndex(index);
+    if (route.closing) {
+      ref.current?.dismiss();
     }
-  }, [index]);
+  }, [route.closing]);
 
-  const onChange = React.useCallback(
+  // Handle snap point changes from navigation actions
+  React.useEffect(() => {
+    if (route.snapToIndex != null && route.snapToIndex !== lastSnapIndexRef.current) {
+      ref.current?.snapToIndex(route.snapToIndex);
+      lastSnapIndexRef.current = route.snapToIndex;
+    }
+  }, [route.snapToIndex, route.snapToKey]);
+
+  const handleChange = React.useCallback(
     (newIndex: number) => {
-      const currentIndex = lastIndexRef.current;
-      lastIndexRef.current = newIndex;
+      const currentIndex = lastSnapIndexRef.current;
+      lastSnapIndexRef.current = newIndex;
+
       if (newIndex >= 0 && newIndex !== currentIndex) {
-        navigation.snapTo(newIndex);
+        navigation.dispatch(BottomSheetActions.snapTo(newIndex));
       }
     },
     [navigation],
   );
 
-  const onDismiss = React.useCallback(() => {
-    // BottomSheetModal will call onDismiss on unmount, be we do not want that since
-    // we already popped the screen.
+  const handleDismiss = React.useCallback(() => {
+    // BottomSheetModal will call onDismiss on unmount, but we don't want that
+    // since we handle navigation state separately
     if (isMounted.current) {
-      navigation.goBack();
+      navigation.dispatch({
+        ...BottomSheetActions.remove(),
+        source: route.key,
+      });
     }
-  }, [navigation]);
+  }, [navigation, route.key]);
 
   return (
     <BottomSheetModal
+      {...props}
       ref={ref}
-      onDismiss={onDismiss}
-      onChange={onChange}
-      index={index}
-      backdropComponent={(props) => (
+      onDismiss={handleDismiss}
+      onChange={handleChange}
+      animatedIndex={animatedIndex}
+      index={props.index}
+      backdropComponent={(backdropProps) => (
         <BottomSheetBackdrop
-          {...props}
+          {...backdropProps}
           appearsOnIndex={0}
           disappearsOnIndex={-1}
           enableTouchThrough={!!clickThrough}
-          opacity={opacity || 0.45}
+          opacity={opacity ?? 0.45}
         />
       )}
-      {...props}
     >
       {children}
     </BottomSheetModal>
   );
 }
-
-const DEFAULT_SNAP_POINTS = ["66%"];
 
 type Props = BottomSheetNavigationConfig & {
   state: BottomSheetNavigationState<ParamListBase>;
@@ -127,15 +251,20 @@ type Props = BottomSheetNavigationConfig & {
   descriptors: BottomSheetDescriptorMap;
 };
 
-export function BottomSheetView({ state, descriptors }: Props) {
+export function BottomSheetView({ state, navigation, descriptors }: Props) {
   const { colors } = useTheme();
-  const { top } = useSafeAreaInsets();
+  const { top, bottom, left, right } = useSafeAreaInsets();
+
   const themeBackgroundStyle = React.useMemo(
     () => ({
+      borderCurve: "continuous" as unknown as undefined,
       backgroundColor: colors.card,
+      borderTopLeftRadius: 20,
+      borderTopRightRadius: 20,
     }),
     [colors.card],
   );
+
   const themeHandleIndicatorStyle = React.useMemo(
     () => ({
       backgroundColor: colors.border,
@@ -145,33 +274,48 @@ export function BottomSheetView({ state, descriptors }: Props) {
     [colors.border],
   );
 
+  const defaultStyle = React.useMemo(
+    () => ({
+      paddingBottom: bottom,
+      paddingLeft: left,
+      paddingRight: right,
+    }),
+    [bottom, left, right],
+  );
+
   // IOS modal sheet type of animation
-  const isFullScreen = useSharedValue(0);
+  const isFullScreen = useSharedValue(-1);
+  const previousIndex = useSharedValue(-1);
+
   const colorStyle = useAnimatedStyle(() => ({
     flex: 1,
-    backgroundColor: interpolateColor(
-      isFullScreen.value,
-      [0, 1],
-      ["transparent", "#000"],
+    backgroundColor: withSpring(
+      interpolateColor(isFullScreen.value, [0, 1], ["transparent", "#000"]),
+      { duration: 150 },
     ),
   }));
-  const animatedStyle = useAnimatedStyle(() => ({
-    flex: 1,
-    transform: [
-      {
-        scaleX: withSpring(interpolate(isFullScreen.value, [0, 1], [1, 0.92]), {
-          damping: 15,
-          stiffness: 100,
-        }),
-      },
-      {
-        translateY: withSpring(interpolate(isFullScreen.value, [0, 1], [0, top + 5]), {
-          damping: 15,
-          stiffness: 100,
-        }),
-      },
-    ],
-  }));
+  const animatedStyle = useAnimatedStyle(
+    () => ({
+      flex: 1,
+      overflow: "hidden",
+      borderRadius: interpolate(isFullScreen.value, [0, 0.8, 1], [0, 20, 24], "clamp"),
+      transform: [
+        {
+          scaleX: withSpring(
+            interpolate(isFullScreen.value, [0, 0.8], [1, 0.92], "clamp"),
+            { duration: 150 },
+          ),
+        },
+        {
+          translateY: withSpring(
+            interpolate(isFullScreen.value, [0, 0.8, 1], [0, top, top + 5], "clamp"),
+            { duration: 150, dampingRatio: 1.5 },
+          ),
+        },
+      ],
+    }),
+    [top],
+  );
 
   // Since background color is white, we need to set status bar to light
   const setStatusBar = StatusBar.setBarStyle;
@@ -186,76 +330,52 @@ export function BottomSheetView({ state, descriptors }: Props) {
     [],
   );
 
-  // Avoid rendering provider if we only have one screen.
-  const shouldRenderProvider = React.useRef(false);
-  shouldRenderProvider.current = shouldRenderProvider.current || state.routes.length > 1;
-
-  const firstRoute = state.routes[0];
-  if (!firstRoute) {
-    // no routes at all, probably shouldn't happen, but let's be defensive
+  // Get the base (first) route - this is the main content
+  const baseRoute = state.routes[0];
+  if (!baseRoute) {
     return null;
   }
 
-  const firstDescriptor = descriptors[firstRoute.key];
-  if (!firstDescriptor) {
-    // if we don't have a descriptor for the first route, bail out
+  const baseDescriptor = descriptors[baseRoute.key];
+  if (!baseDescriptor) {
     return null;
   }
+
+  // Sheet routes are all routes after the base route
+  const sheetRoutes = state.routes.slice(1);
+  const hasSheets = sheetRoutes.length > 0;
 
   return (
     <>
+      {/* Base content with iOS modal animation */}
       <Animated.View style={colorStyle}>
-        <Animated.View style={animatedStyle}>{firstDescriptor.render?.()}</Animated.View>
+        <Animated.View style={animatedStyle}>{baseDescriptor.render?.()}</Animated.View>
       </Animated.View>
-      {shouldRenderProvider.current && (
+
+      {/* Bottom sheet modals */}
+      {hasSheets && (
         <BottomSheetModalProvider>
-          {state.routes.slice(1).map((route) => {
+          {sheetRoutes.map((route) => {
+            // Skip routes that are being removed
+            if (route.closing && !descriptors[route.key]) {
+              return null;
+            }
+
             const descriptor = descriptors[route.key];
             if (!descriptor) return null;
 
-            const { options, navigation, render } = descriptor;
-            const {
-              index,
-              snapPoints,
-              handleStyle,
-              backgroundStyle,
-              handleIndicatorStyle,
-              enableDynamicSizing,
-              ...sheetProps
-            } = options;
-
             return (
-              <BottomSheetModalScreen
+              <AnimatedSheetWrapper
                 key={route.key}
-                // Make sure index is in range, it could be out if snapToIndex is persisted
-                // and snapPoints is changed.
-                index={Math.min(
-                  route.snapToIndex ?? index ?? 0,
-                  !!snapPoints ? snapPoints.length - 1 : 0,
-                )}
-                snapPoints={
-                  !snapPoints && !enableDynamicSizing ? DEFAULT_SNAP_POINTS : snapPoints
-                }
-                onAnimate={(_, to) => {
-                  // @ts-ignore TODO: Fix types
-                  isFullScreen.value = ["%100", "100%"].includes(snapPoints?.[to])
-                    ? 1
-                    : 0;
-                }}
-                animationConfigs={{
-                  duration: 300,
-                  easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-                }}
-                topInset={top + 18}
+                route={route}
                 navigation={navigation}
-                enableDynamicSizing={enableDynamicSizing}
-                backgroundStyle={[themeBackgroundStyle, backgroundStyle]}
-                handleIndicatorStyle={[themeHandleIndicatorStyle, handleIndicatorStyle]}
-                handleStyle={[themeBackgroundStyle, { borderRadius: 20 }, handleStyle]}
-                {...sheetProps}
-              >
-                {render?.()}
-              </BottomSheetModalScreen>
+                descriptor={descriptor}
+                isFullScreen={isFullScreen}
+                previousIndex={previousIndex}
+                defaultStyle={defaultStyle}
+                themeBackgroundStyle={themeBackgroundStyle}
+                themeHandleIndicatorStyle={themeHandleIndicatorStyle}
+              />
             );
           })}
         </BottomSheetModalProvider>
