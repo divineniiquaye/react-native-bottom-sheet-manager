@@ -16,7 +16,8 @@
     "delete-dts.js": "find ./lib/commonjs -name '*.d.js*' -delete && find ./lib/module -name '*.d.js*' -delete",
     "release": "rm -rf lib && yarn build && release-it",
     "example": "yarn --cwd example",
-    "bootstrap": "yarn install && yarn example"
+    "bootstrap": "yarn install && yarn example",
+    "test": "jest"
   },
   "repository": {
     "type": "git",
@@ -71,6 +72,7 @@
     "nanoid": "^5.1.6"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.12",
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
     "@ianvs/prettier-plugin-sort-imports": "file:patched/prettier-plugin-sort-imports",
@@ -87,6 +89,8 @@
     "react-native-gesture-handler": "~2.20.2",
     "react-native-reanimated": "~3.19.1",
     "react-native-safe-area-context": "~5.6.0",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
     "release-it": "^19.0.4",
     "typescript": "^5.8.3"
   },
