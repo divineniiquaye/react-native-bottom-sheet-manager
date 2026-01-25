@@ -20,9 +20,9 @@ import {
 } from "react-native";
 import {
   Easing,
-  interpolate,
   useAnimatedReaction,
   useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTheme } from "@react-navigation/native";
@@ -33,8 +33,9 @@ import {
   useSheetAnimationContext,
   useSheetIDContext,
   useSheetRef,
+  useStackBehaviorContext,
 } from "./provider";
-import { BottomSheetInstance, BottomSheetProps, SheetIds } from "./types";
+import { BottomSheetInstance, BottomSheetProps, SheetIds, StackBehavior } from "./types";
 import { PrivateManager } from "./manager";
 import { eventManager } from "./events";
 
@@ -64,34 +65,42 @@ const useSheetManager = ({
   onContextUpdate,
 }: {
   id?: string;
-  onHide: (data?: any, dismiss?: boolean) => void;
-  onBeforeShow?: (data?: any) => void;
+  onHide: (data?: unknown, dismiss?: boolean, behavior?: StackBehavior) => void;
+  onBeforeShow?: (data?: unknown, behavior?: StackBehavior) => void;
   onContextUpdate: () => void;
 }) => {
-  const [visible, setVisible] = React.useState(false);
   const currentContext = useProviderContext();
+  const hasShownRef = React.useRef(false);
 
   React.useEffect(() => {
     if (!id) return undefined;
 
     const subscriptions = [
-      eventManager.subscribe(`show_${id}`, (data: any, context?: string) => {
-        if (currentContext !== context || visible) return;
-        onContextUpdate?.();
-        onBeforeShow?.(data);
-        setVisible(true);
-      }),
-      eventManager.subscribe(`hide_${id}`, (data: any, context, dismiss?: boolean) => {
-        if (currentContext !== context) return;
-        onHide?.(data, dismiss);
-      }),
+      eventManager.subscribe(
+        `show_${id}`,
+        (data: unknown, context?: string, behavior?: StackBehavior) => {
+          if (currentContext !== context) return;
+          if (!hasShownRef.current) {
+            hasShownRef.current = true;
+            onContextUpdate?.();
+            onBeforeShow?.(data, behavior);
+          }
+        },
+      ),
+      eventManager.subscribe(
+        `hide_${id}`,
+        (data: unknown, context: string, dismiss?: boolean, behavior?: StackBehavior) => {
+          if (currentContext !== context) return;
+          hasShownRef.current = false;
+          onHide?.(data, dismiss, behavior);
+        },
+      ),
     ];
     return () => {
+      hasShownRef.current = false;
       subscriptions.forEach((s) => s?.unsubscribe?.());
     };
   }, [id, onHide, onBeforeShow, onContextUpdate, currentContext]);
-
-  return { visible, setVisible };
 };
 
 const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetProps>(
@@ -106,10 +115,12 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
       enableDynamicSizing = false,
       handleIndicatorStyle,
       iosModalSheetTypeOfAnimation: pageAnimation,
+      animatedIndex: defaultAnimatedIndex,
       backgroundStyle,
+      onAnimate,
       handleStyle,
+      style,
       clickThrough,
-      fullScreen,
       opacity,
 
       ...props
@@ -118,14 +129,27 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
   ) => {
     const currentSheetRef = useSheetRef();
     const currentCtx = useProviderContext();
+    const stackContext = useStackBehaviorContext();
 
-    const { isFullScreen, iosModalSheetTypeOfAnimation } = useSheetAnimationContext();
+    const { isFullScreen, iosModalSheetTypeOfAnimation, duration } =
+      useSheetAnimationContext();
     const animatedIndex = useSharedValue(0);
+    const previousIndex = useSharedValue(-1);
+
+    const [currentStackBehavior, setCurrentStackBehavior] =
+      React.useState<StackBehavior>(stackBehavior);
+    const isPushed = currentStackBehavior === "push";
 
     const { colors } = useTheme();
-    const { top } = useSafeAreaInsets();
+    const { bottom, left, right } = useSafeAreaInsets();
+
     const themeBackgroundStyle = React.useMemo(
-      () => ({ backgroundColor: colors.card }),
+      () => ({
+        borderCurve: "continuous" as unknown as undefined,
+        backgroundColor: colors.card,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+      }),
       [colors.card],
     );
     const themeHandleIndicatorStyle = React.useMemo(
@@ -137,6 +161,15 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
       [colors.border],
     );
 
+    const defaultStyle = React.useMemo(
+      () => ({
+        paddingBottom: bottom,
+        paddingLeft: left,
+        paddingRight: right,
+      }),
+      [bottom, left, right],
+    );
+
     const valueRef = React.useRef<unknown>(null);
     const bottomSheetRef = React.useRef<BottomSheetModal>(null);
     const hardwareBackPressEvent = React.useRef<NativeEventSubscription>(
@@ -145,10 +178,15 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
 
     const id = useSheetIDContext();
     const sheetId = props.id || id;
+
     useSheetManager({
       id: sheetId,
-      onHide: (data, dismiss) => hideSheet(data, true, dismiss),
-      onBeforeShow: (data) => {
+      onHide: (data, dismiss, behavior) => {
+        if (behavior) setCurrentStackBehavior(behavior);
+        hideSheet(data, true, dismiss);
+      },
+      onBeforeShow: (data, behavior) => {
+        if (behavior) setCurrentStackBehavior(behavior);
         onBeforeShow?.(data);
         valueRef.current = undefined;
         currentSheetRef.current = getInstance();
@@ -164,70 +202,111 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
     });
 
     useAnimatedReaction(
-      () => {
-        if (!!iosModalSheetTypeOfAnimation || !!pageAnimation) {
-          isFullScreen.value = 0;
-        }
-        return animatedIndex.value;
-      },
+      () => animatedIndex.value,
       (index) => {
-        "worklet";
-        const points: (string | number)[] = ["%100", "100%"];
-        const checkFullScreen = fullScreen
-          ? -1
-          : snapPoints instanceof Array
+        ("worklet");
+        if (defaultAnimatedIndex) {
+          defaultAnimatedIndex.set(index);
+        }
+
+        if (!iosModalSheetTypeOfAnimation && !pageAnimation) {
+          if (isFullScreen.value > 0) isFullScreen.set(0);
+          previousIndex.set(index);
+          return;
+        }
+
+        if (isFullScreen.value < 0) {
+          isFullScreen.set(0);
+        }
+
+        const isClosing =
+          index < 0 || (previousIndex.value >= 0 && index < previousIndex.value - 0.05);
+        previousIndex.set(index);
+
+        if (isClosing) {
+          if (isFullScreen.value > 0.01) {
+            isFullScreen.set(
+              withTiming(0, {
+                duration: duration * 0.85,
+                easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+              }),
+            );
+          }
+          return;
+        }
+
+        const points: (string | number)[] = ["%90", "90%"];
+        const fullScreenIndex =
+          snapPoints instanceof Array
             ? snapPoints.findIndex((p) => points.includes(p))
             : snapPoints?.value?.findIndex((p) => points.includes(p)) || -1;
 
-        if (
-          -1 !== checkFullScreen &&
-          (!!iosModalSheetTypeOfAnimation || !!pageAnimation)
-        ) {
-          isFullScreen.value = interpolate(
-            index,
-            [checkFullScreen - 1, checkFullScreen],
-            [0, 1],
-          );
+        if (index >= fullScreenIndex - 0.5 && index <= fullScreenIndex + 0.5) {
+          isFullScreen.set(1);
+        } else if (index >= 0) {
+          isFullScreen.set(0);
         }
       },
-      [snapPoints],
+      [snapPoints, iosModalSheetTypeOfAnimation, pageAnimation, duration],
     );
 
     const hideSheet = React.useCallback(
-      (data?: any, isSheetManagerOrRef?: boolean, dismiss?: boolean) => {
+      (data?: unknown, fromManager?: boolean, dismiss?: boolean) => {
         let value = data ?? valueRef.current;
 
-        if (!dismiss || stackBehavior !== "push") {
-          hardwareBackPressEvent.current?.remove();
+        hardwareBackPressEvent.current?.remove();
+
+        const closeValue = onClose?.(value);
+        if (closeValue !== undefined) value = closeValue;
+
+        if (dismiss && currentStackBehavior === "push") {
+          if (fromManager) valueRef.current = data;
+          return;
+        }
+
+        if (currentStackBehavior !== "replace" || !dismiss) {
           bottomSheetRef.current?.close();
-          const closeValue = onClose?.(value);
-          if (undefined !== closeValue) value = closeValue;
         }
 
         if (sheetId) {
-          PrivateManager.remove(sheetId, currentCtx);
-          if (dismiss && stackBehavior === "push") return;
+          const hasHistory = PrivateManager.history.length > 0;
+          const shouldRestorePrevious = currentStackBehavior !== "replace";
 
-          const history = PrivateManager.history.length >= 1;
           eventManager.publish(
             `onclose_${sheetId}`,
             value,
             currentCtx,
-            history || dismiss,
+            hasHistory || !!dismiss,
+            currentStackBehavior,
           );
 
-          if (stackBehavior === "replace") return;
-          if (dismiss) {
-            PrivateManager.history.push({ id: sheetId, context: currentCtx });
-          } else if (history) {
-            const { id, context } = PrivateManager.history.pop()!;
-            eventManager.publish(`show_wrap_${id}`, undefined, context, true);
+          if (shouldRestorePrevious) {
+            if (dismiss) {
+              PrivateManager.history.push({
+                id: sheetId,
+                context: currentCtx,
+                behavior: currentStackBehavior,
+              });
+            } else if (hasHistory) {
+              const prev = PrivateManager.history.pop()!;
+              eventManager.publish(
+                `show_wrap_${prev.id}`,
+                undefined,
+                prev.context,
+                true,
+                prev.behavior,
+              );
+            }
           }
+
+          PrivateManager.remove(sheetId, currentCtx);
         }
-        if (isSheetManagerOrRef) valueRef.current = data;
+
+        if (fromManager) valueRef.current = data;
       },
-      [sheetId, currentCtx, onClose],
+      [sheetId, currentCtx, onClose, currentStackBehavior],
     );
+
     const getInstance = React.useCallback(
       (): BottomSheetInstance => ({
         close(options = {}): void {
@@ -275,40 +354,54 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
 
     React.useImperativeHandle(ref, getInstance, [getInstance]);
 
+    const zIndex = React.useMemo(() => {
+      if (!sheetId) return 0;
+      if (isPushed) {
+        return PrivateManager.zIndex(sheetId, currentCtx);
+      }
+      return 0;
+    }, [sheetId, isPushed, currentCtx]);
+
+    const backdropOpacity = React.useMemo(() => {
+      if (isPushed && stackContext.previousSheetId) {
+        return (opacity || 0.45) * 0.6;
+      }
+      return opacity || 0.45;
+    }, [isPushed, stackContext.previousSheetId, opacity]);
+
     return (
-      <View
-        pointerEvents="box-none"
-        style={[
-          StyleSheet.absoluteFill,
-          {
-            zIndex:
-              sheetId && stackBehavior === "push"
-                ? PrivateManager.zIndex(sheetId, currentCtx)
-                : 0,
-          },
-        ]}
-      >
+      <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex }]}>
         <RNBottomSheet
           enableDynamicSizing={enableDynamicSizing}
-          animationConfigs={{ duration: 400, easing: Easing.bezier(0.25, 0.1, 0.25, 1) }}
-          backdropComponent={(props) => (
+          backdropComponent={(backdropProps) => (
             <BottomSheetBackdrop
               enableTouchThrough={!!clickThrough}
-              opacity={opacity || 0.45}
+              opacity={backdropOpacity}
               disappearsOnIndex={-1}
               appearsOnIndex={0}
-              {...props}
+              {...backdropProps}
             />
           )}
+          onAnimate={(from, to, ...args) => {
+            const snapPointLen = Array.isArray(snapPoints)
+              ? snapPoints.length
+              : (snapPoints?.value?.length ?? 0);
+
+            if (to >= isFullScreen.value && to > snapPointLen - 1) {
+              isFullScreen.set(0);
+            } else if (to > 0 && to === previousIndex.value && isFullScreen.value === 0) {
+              isFullScreen.set(1);
+            }
+
+            onAnimate?.(from, to, ...args);
+          }}
+          topInset={0}
+          bottomInset={0}
           {...props}
           ref={bottomSheetRef}
           onClose={hideSheet}
           animatedIndex={animatedIndex}
-          topInset={
-            fullScreen
-              ? 0
-              : top + (iosModalSheetTypeOfAnimation || pageAnimation ? 20 : 5)
-          }
+          style={[defaultStyle, style]}
           snapPoints={enableDynamicSizing ? undefined : (snapPoints ?? ["66%"])}
           handleIndicatorStyle={[themeHandleIndicatorStyle, handleIndicatorStyle]}
           backgroundStyle={[themeBackgroundStyle, backgroundStyle]}
@@ -334,18 +427,5 @@ BottomSheet.Footer = BottomSheetFooter;
 BottomSheet.FooterContainer = BottomSheetFooterContainer;
 BottomSheet.Backdrop = BottomSheetBackdrop;
 BottomSheet.TextInput = BottomSheetTextInput;
-
-try {
-  const { cssInterop } = require("nativewind");
-  cssInterop(BottomSheet, {
-    handleIndicatorClassName: "handleIndicatorStyle",
-    backgroundClassName: "backgroundStyle",
-    containerClassName: "containerStyle",
-    handleClassName: "handleStyle",
-    className: "style",
-  });
-} catch (e) {
-  // Ignore error
-}
 
 export default BottomSheet;

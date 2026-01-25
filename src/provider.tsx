@@ -1,7 +1,3 @@
-import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
-import { StatusBar } from "react-native";
-import React from "react";
 import Animated, {
   interpolate,
   interpolateColor,
@@ -11,10 +7,13 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-  withTiming,
 } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
+import { StatusBar } from "react-native";
+import React from "react";
 
-import { BottomSheetInstance, SheetPayload, Sheets } from "./types";
+import { BottomSheetInstance, SheetPayload, Sheets, StackBehavior } from "./types";
 import { eventManager } from "./events";
 
 export const providerRegistryStack: string[] = [];
@@ -51,6 +50,15 @@ export function registerSheet<SheetId extends keyof Sheets = never>(
 }
 
 /**
+ * Animation configuration for iOS modal sheet style animations.
+ * @deprecated Use duration prop directly instead
+ */
+export interface ModalSheetAnimationConfig {
+  /** Duration of the animation in milliseconds */
+  duration: number;
+}
+
+/**
  * The SheetProvider makes available the sheets in a given context. The default context is
  * `global`. However if you want to render a Sheet within another sheet or if you want to render
  * Sheets in a modal. You can use a separate Provider with a custom context value.
@@ -71,7 +79,7 @@ export function registerSheet<SheetId extends keyof Sheets = never>(
 export function SheetProvider({
   iosModalSheetTypeOfAnimation = false,
   context = "global",
-  duration = 300,
+  duration = 150,
   children,
 }: React.PropsWithChildren<{
   context?: string;
@@ -82,17 +90,13 @@ export function SheetProvider({
   const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
   const sheetIds = Object.keys(sheetsRegistry[context] || sheetsRegistry["global"] || {});
 
-  // Rerender when a new sheet is added.
-  const onRegister = React.useCallback(forceUpdate, [forceUpdate]);
-
   // IOS modal sheet type of animation
   const isFullScreen = useSharedValue(-1);
   const colorStyle = useAnimatedStyle(() => ({
     flex: 1,
-    backgroundColor: interpolateColor(
-      isFullScreen.value,
-      [0, 1],
-      ["transparent", "#000"],
+    backgroundColor: withSpring(
+      interpolateColor(isFullScreen.value, [0, 1], ["transparent", "#000"]),
+      { duration },
     ),
   }));
   const animatedStyle = useAnimatedStyle(
@@ -102,14 +106,14 @@ export function SheetProvider({
       borderRadius: interpolate(isFullScreen.value, [0, 0.8, 1], [0, 20, 24], "clamp"),
       transform: [
         {
-          scaleX: withTiming(
-            interpolate(isFullScreen.value, [0, 0.98, 1], [1, 1, 0.92], "clamp"),
+          scaleX: withSpring(
+            interpolate(isFullScreen.value, [0, 0.8], [1, 0.92], "clamp"),
             { duration },
           ),
         },
         {
           translateY: withSpring(
-            interpolate(isFullScreen.value, [0, 0.99, 1], [0, top, top + 5], "clamp"),
+            interpolate(isFullScreen.value, [0, 0.8, 1], [0, top, top + 5], "clamp"),
             { duration, dampingRatio: 1.5 },
           ),
         },
@@ -135,23 +139,23 @@ export function SheetProvider({
     providerRegistryStack.indexOf(context) > -1
       ? providerRegistryStack.indexOf(context)
       : providerRegistryStack.push(context) - 1;
-    const unsub = eventManager.subscribe(`${context}-on-register`, onRegister);
+    const unsub = eventManager.subscribe(`${context}-on-register`, forceUpdate);
     return () => {
       providerRegistryStack.splice(providerRegistryStack.indexOf(context), 1);
       unsub?.unsubscribe();
     };
-  }, [context, onRegister]);
+  }, [context, forceUpdate]);
 
   return (
     <SheetAnimationContext.Provider
-      value={{ isFullScreen, iosModalSheetTypeOfAnimation }}
+      value={{ isFullScreen, iosModalSheetTypeOfAnimation, duration }}
     >
       <Animated.View style={colorStyle}>
         <Animated.View style={animatedStyle}>{children}</Animated.View>
       </Animated.View>
       <BottomSheetModalProvider>
         {sheetIds.map((id) => (
-          <RenderSheet key={id} id={id} context={context} duration={duration} />
+          <RenderSheet key={id} id={id} context={context} />
         ))}
       </BottomSheetModalProvider>
     </SheetAnimationContext.Provider>
@@ -162,13 +166,31 @@ const SheetIDContext = React.createContext<string | undefined>(undefined);
 const SheetAnimationContext = React.createContext<{
   iosModalSheetTypeOfAnimation: boolean;
   isFullScreen: SharedValue<number>;
-}>({ isFullScreen: { value: 0 } as any, iosModalSheetTypeOfAnimation: false });
+  duration: number;
+}>({
+  isFullScreen: { value: 0 } as SharedValue<number>,
+  iosModalSheetTypeOfAnimation: false,
+  duration: 300,
+});
 
 export const SheetRefContext = React.createContext<
   React.RefObject<BottomSheetInstance | null>
->({} as any);
+>({} as React.RefObject<BottomSheetInstance | null>);
 
-const SheetPayloadContext = React.createContext<any>(undefined);
+const SheetPayloadContext = React.createContext<unknown>(undefined);
+
+// Stack behavior context for managing sheet transitions
+interface StackBehaviorContextValue {
+  behavior: StackBehavior;
+  isTransitioning: boolean;
+  previousSheetId: string | null;
+}
+
+const StackBehaviorContext = React.createContext<StackBehaviorContextValue>({
+  behavior: "switch",
+  isTransitioning: false,
+  previousSheetId: null,
+});
 
 /**
  * Get id of the current context.
@@ -182,6 +204,10 @@ export const useSheetIDContext = () => React.useContext(SheetIDContext);
  * Get the current sheet animation context.
  */
 export const useSheetAnimationContext = () => React.useContext(SheetAnimationContext);
+/**
+ * Get stack behavior context for the current sheet.
+ */
+export const useStackBehaviorContext = () => React.useContext(StackBehaviorContext);
 /**
  * Get the current Sheet's internal ref.
  */
@@ -205,25 +231,26 @@ export function useSheetPayload<SheetId extends keyof Sheets = never>() {
 export function useOnSheet<SheetId extends keyof Sheets = never>(
   id: SheetId | (string & {}),
   type: "show" | "hide" | "onclose",
-  listener: (payload: SheetPayload<SheetId>, context: string, ...args: any[]) => void,
+  listener: (payload: SheetPayload<SheetId>, context: string, ...args: unknown[]) => void,
 ) {
   React.useEffect(() => {
     const subscription = eventManager.subscribe(`${type}_${id}`, listener);
     return () => subscription.unsubscribe();
-  }, [id, listener]);
+  }, [id, listener, type]);
 }
 
-const RenderSheet = ({
-  id,
-  context,
-  duration,
-}: {
+interface RenderSheetProps {
   id: string;
   context: string;
-  duration: number;
-}) => {
-  const [payload, setPayload] = React.useState();
+}
+
+const RenderSheet = ({ id, context }: RenderSheetProps) => {
+  const [payload, setPayload] = React.useState<unknown>();
   const [visible, setVisible] = React.useState(false);
+  const [stackBehavior, setStackBehavior] = React.useState<StackBehavior>("switch");
+  const [isPending, startTransition] = React.useTransition();
+  const [previousSheetId, setPreviousSheetId] = React.useState<string | null>(null);
+
   const ref = React.useRef<BottomSheetInstance | null>(null);
   const Sheet = context.startsWith("$$-auto-")
     ? sheetsRegistry?.global?.[id]
@@ -232,29 +259,46 @@ const RenderSheet = ({
       : undefined;
 
   const onShow = React.useCallback(
-    (data: any, ctx = "global", reopened?: boolean) => {
+    (data: unknown, ctx = "global", reopened?: boolean, behavior?: StackBehavior) => {
       if (ctx !== context) return;
-      if (!reopened) setPayload(data);
-      setVisible(true);
+
+      if (behavior) {
+        setStackBehavior(behavior);
+      }
+
+      if (!reopened) {
+        setPayload(data);
+      }
+
+      // Smooth transition handling using React's useTransition
+      startTransition(() => {
+        setVisible(true);
+      });
     },
     [context],
   );
 
   const onClose = React.useCallback(
-    (_data: any, ctx = "global", reopened?: boolean) => {
+    (_data: unknown, ctx = "global", reopened?: boolean, nextSheetId?: string) => {
       if (context !== ctx) return;
+
+      if (nextSheetId) {
+        setPreviousSheetId(nextSheetId);
+      }
+
       if (!reopened) {
         setPayload(undefined);
-        setTimeout(() => setVisible(false), Math.max(duration ?? 300, 300));
+        setVisible(false);
       } else {
         setVisible(false);
+        setPreviousSheetId(null);
       }
     },
     [context],
   );
 
   const onHide = React.useCallback(
-    (data: any, ctx = "global") => {
+    (data: unknown, ctx = "global") => {
       eventManager.publish(`hide_${id}`, data, ctx);
     },
     [id],
@@ -267,7 +311,7 @@ const RenderSheet = ({
   }, [context, id, payload, visible]);
 
   React.useEffect(() => {
-    let subs = [
+    const subs = [
       eventManager.subscribe(`show_wrap_${id}`, onShow),
       eventManager.subscribe(`onclose_${id}`, onClose),
       eventManager.subscribe(`hide_wrap_${id}`, onHide),
@@ -279,15 +323,25 @@ const RenderSheet = ({
 
   if (!Sheet) return null;
 
-  return visible ? (
+  const stackContextValue: StackBehaviorContextValue = {
+    behavior: stackBehavior,
+    isTransitioning: isPending,
+    previousSheetId,
+  };
+
+  if (!visible) return null;
+
+  return (
     <ProviderContext.Provider value={context}>
       <SheetIDContext.Provider value={id}>
         <SheetRefContext.Provider value={ref}>
           <SheetPayloadContext.Provider value={payload}>
-            <Sheet id={id} payload={payload} context={context} />
+            <StackBehaviorContext.Provider value={stackContextValue}>
+              <Sheet id={id} payload={payload} context={context} />
+            </StackBehaviorContext.Provider>
           </SheetPayloadContext.Provider>
         </SheetRefContext.Provider>
       </SheetIDContext.Provider>
     </ProviderContext.Provider>
-  ) : null;
+  );
 };

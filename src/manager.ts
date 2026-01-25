@@ -1,8 +1,8 @@
 import { RefObject } from "react";
 
-import { eventManager } from "./events";
+import { BottomSheetInstance, Sheets, StackBehavior } from "./types";
 import { providerRegistryStack, sheetsRegistry } from "./provider";
-import { BottomSheetInstance, Sheets } from "./types";
+import { eventManager } from "./events";
 
 // Array of all the ids of Sheets currently rendered in the app.
 const ids: string[] = [];
@@ -12,14 +12,20 @@ const DEFAULT_Z_INDEX = 999;
 
 const makeKey = (id: string, context: string) => `${id}:${context}`;
 
+interface HistoryEntry {
+    id: string;
+    context: string;
+    behavior: StackBehavior;
+}
+
 export const PrivateManager = {
-    // Return to the previous sheet when the current sheet is closed.
-    history: [] as { id: string; context: string }[],
+    // Stack of sheet history for restoration when sheets are closed
+    history: [] as HistoryEntry[],
 
     context(options?: { context?: string; id?: string }) {
         if (!options) options = {};
         if (!options?.context) {
-            // If no context is provided, use to current top most context
+            // If no context is provided, use the current top-most context
             // to render the sheet.
             for (const context of providerRegistryStack.slice().reverse()) {
                 // We only automatically select nested sheet providers.
@@ -42,11 +48,12 @@ export const PrivateManager = {
     ) => {
         const key = makeKey(id, context);
         refs[key] = instance;
-        keys.push(key);
+        if (!keys.includes(key)) {
+            keys.push(key);
+        }
     },
 
     /**
-     *
      * Get internal ref of a sheet by the given id.
      *
      * @param id Id of the sheet
@@ -57,8 +64,8 @@ export const PrivateManager = {
         context?: string,
     ): RefObject<BottomSheetInstance<SheetId>> => {
         if (!context) {
-            for (let ctx of providerRegistryStack.slice().reverse()) {
-                for (let _id in sheetsRegistry[ctx]) {
+            for (const ctx of providerRegistryStack.slice().reverse()) {
+                for (const _id in sheetsRegistry[ctx]) {
                     if (_id === id) {
                         context = ctx;
                         break;
@@ -70,14 +77,17 @@ export const PrivateManager = {
     },
 
     add: (id: string, context: string) => {
-        if (ids.indexOf(id) < 0) {
-            ids[ids.length] = makeKey(id, context);
+        const key = makeKey(id, context);
+        if (!ids.includes(key)) {
+            ids.push(key);
         }
     },
 
     remove: (id: string, context: string) => {
-        if (ids.indexOf(makeKey(id, context)) > -1) {
-            ids.splice(ids.indexOf(makeKey(id, context)));
+        const key = makeKey(id, context);
+        const index = ids.indexOf(key);
+        if (index > -1) {
+            ids.splice(index, 1);
         }
     },
 
@@ -87,12 +97,39 @@ export const PrivateManager = {
     },
 
     stack: () =>
-        ids.map((id) => {
-            return {
-                id: id.split(":")[0],
-                context: id.split(":")?.[1] || "global",
-            };
-        }),
+        ids.map((id) => ({
+            id: id.split(":")[0],
+            context: id.split(":")?.[1] || "global",
+        })),
+
+    /**
+     * Get the top-most sheet in the stack
+     */
+    topSheet: () => {
+        if (ids.length === 0) return null;
+        const topId = ids[ids.length - 1];
+        return {
+            id: topId.split(":")[0],
+            context: topId.split(":")?.[1] || "global",
+        };
+    },
+
+    /**
+     * Check if a sheet is currently visible
+     */
+    isSheetVisible: (id: string, context?: string): boolean => {
+        if (context) {
+            return ids.includes(makeKey(id, context));
+        }
+        return ids.some((key) => key.startsWith(`${id}:`));
+    },
+
+    /**
+     * Clear all history entries
+     */
+    clearHistory: () => {
+        PrivateManager.history = [];
+    },
 };
 
 class _SheetManager {
@@ -119,36 +156,67 @@ class _SheetManager {
              * Provide `context` of the `SheetProvider` where you want to show the action sheet.
              */
             context?: string;
+
+            /**
+             * Stack behavior for this sheet.
+             * - `switch`: (default) Closes current sheet, shows new one
+             * - `replace`: Swaps content with crossfade animation
+             * - `push`: Stacks new sheet on top of current
+             */
+            stackBehavior?: StackBehavior;
         },
     ): Promise<Sheets[SheetId]["returnValue"]> {
         return new Promise((resolve) => {
             const currentContext = PrivateManager.context({ ...options, id: id });
-            const handler = (data: any, context = "global") => {
+            const behavior = options?.stackBehavior ?? "switch";
+
+            const handler = (
+                data: unknown,
+                context = "global",
+                _reopened?: boolean,
+                _behavior?: StackBehavior,
+            ) => {
                 if (context !== "global" && currentContext && currentContext !== context)
                     return;
-                options?.onClose?.(data);
+                options?.onClose?.(data as Sheets[SheetId]["returnValue"]);
                 sub?.unsubscribe();
-                resolve(data);
+                resolve(data as Sheets[SheetId]["returnValue"]);
             };
 
-            var sub = eventManager.subscribe(`onclose_${id}`, handler);
-            PrivateManager.stack().forEach(({ id, context }) => {
-                eventManager.publish(`hide_${id}`, undefined, context, true);
-            });
+            const sub = eventManager.subscribe(`onclose_${id}`, handler);
+
+            // Handle existing sheets based on stack behavior
+            const currentStack = PrivateManager.stack();
+            if (currentStack.length > 0) {
+                currentStack.forEach(({ id: sheetId, context }) => {
+                    eventManager.publish(
+                        `hide_${sheetId}`,
+                        undefined,
+                        context,
+                        true,
+                        behavior,
+                    );
+                });
+            }
 
             // Check if the sheet is registered with any `SheetProviders`.
             let isRegisteredWithSheetProvider = false;
-            for (let ctx in sheetsRegistry) {
-                for (let _id in sheetsRegistry[ctx]) {
+            for (const ctx in sheetsRegistry) {
+                for (const _id in sheetsRegistry[ctx]) {
                     if (_id === id) {
                         isRegisteredWithSheetProvider = true;
+                        break;
                     }
                 }
+                if (isRegisteredWithSheetProvider) break;
             }
+
             eventManager.publish(
                 isRegisteredWithSheetProvider ? `show_wrap_${id}` : `show_${id}`,
                 options?.payload,
                 currentContext || "global",
+                false,
+                behavior,
             );
         });
     }
@@ -157,7 +225,7 @@ class _SheetManager {
      * An async hide function. This is useful when you want to show one Sheet after closing another.
      *
      * @param id id of the Sheet to show
-     * @param data
+     * @param options
      */
     async hide<SheetId extends keyof Sheets>(
         id: SheetId | (string & {}),
@@ -172,10 +240,11 @@ class _SheetManager {
             context?: string;
         },
     ): Promise<Sheets[SheetId]["returnValue"]> {
-        let currentContext = PrivateManager.context({
+        const currentContext = PrivateManager.context({
             ...options,
             id: id,
         });
+
         return new Promise((resolve) => {
             let isRegisteredWithSheetProvider = false;
             // Check if the sheet is registered with any `SheetProviders`
@@ -188,14 +257,14 @@ class _SheetManager {
                 }
             }
 
-            const hideHandler = (data: any, context = "global") => {
+            const hideHandler = (data: unknown, context = "global") => {
                 if (context !== "global" && currentContext && currentContext !== context)
                     return;
                 sub?.unsubscribe();
-                resolve(data);
+                resolve(data as Sheets[SheetId]["returnValue"]);
             };
 
-            var sub = eventManager.subscribe(`onclose_${id}`, hideHandler);
+            const sub = eventManager.subscribe(`onclose_${id}`, hideHandler);
             eventManager.publish(
                 isRegisteredWithSheetProvider ? `hide_wrap_${id}` : `hide_${id}`,
                 options?.payload,
@@ -210,10 +279,64 @@ class _SheetManager {
      * @param id Hide all sheets for the specific id.
      */
     hideAll<SheetId extends keyof Sheets>(id?: SheetId | (string & {})) {
+        // Clear history when hiding all sheets
+        PrivateManager.clearHistory();
+
         PrivateManager.stack().forEach(({ id: _id, context }) => {
             if (id && !_id.startsWith(id)) return;
             eventManager.publish(`hide_${_id}`, undefined, context);
         });
+    }
+
+    /**
+     * Replace the current sheet with a new one using crossfade animation.
+     * This is a convenience method for show() with stackBehavior: 'replace'.
+     */
+    async replace<SheetId extends keyof Sheets>(
+        id: SheetId | (string & {}),
+        options?: {
+            payload?: Sheets[SheetId]["payload"];
+            onClose?: (data: Sheets[SheetId]["returnValue"] | undefined) => void;
+            context?: string;
+        },
+    ): Promise<Sheets[SheetId]["returnValue"]> {
+        return this.show(id, { ...options, stackBehavior: "replace" });
+    }
+
+    /**
+     * Push a new sheet on top of the current one, creating a stack.
+     * This is a convenience method for show() with stackBehavior: 'push'.
+     */
+    async push<SheetId extends keyof Sheets>(
+        id: SheetId | (string & {}),
+        options?: {
+            payload?: Sheets[SheetId]["payload"];
+            onClose?: (data: Sheets[SheetId]["returnValue"] | undefined) => void;
+            context?: string;
+        },
+    ): Promise<Sheets[SheetId]["returnValue"]> {
+        return this.show(id, { ...options, stackBehavior: "push" });
+    }
+
+    /**
+     * Pop the top sheet from the stack and restore the previous one.
+     * Only works when sheets were opened with stackBehavior: 'push'.
+     */
+    pop(): void {
+        const topSheet = PrivateManager.topSheet();
+        if (topSheet) {
+            eventManager.publish(`hide_${topSheet.id}`, undefined, topSheet.context);
+        }
+    }
+
+    /**
+     * Check if a specific sheet is currently visible.
+     */
+    isVisible<SheetId extends keyof Sheets>(
+        id: SheetId | (string & {}),
+        context?: string,
+    ): boolean {
+        return PrivateManager.isSheetVisible(id, context);
     }
 }
 
