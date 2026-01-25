@@ -35,11 +35,11 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Setup Node.js (for npm with OIDC support)
+      - name: Setup Node.js (for yarn with OIDC support)
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
+          cache: 'yarn'
 
       - name: Configure git
         run: |
@@ -47,10 +47,10 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Install dependencies
-        run: npm install
+        run: yarn install --frozen-lockfile
 
       - name: Build library
-        run: npm run build
+        run: yarn build
 
       - name: Determine version
         id: determine_version
@@ -234,11 +234,12 @@ jobs:
           echo "  Version: ${{ steps.determine_version.outputs.version }}"
           echo "  Tag: ${{ inputs.npm_tag }}"
           echo "  Already published: ${{ steps.check_published.outputs.published }}"
-          npm pack --dry-run
+          yarn pack --dry-run || npm pack --dry-run
 
       - name: Publish to NPM
         if: ${{ !inputs.dry_run && steps.check_published.outputs.published == 'false' }}
         run: |
+          # Use npm publish for provenance support (yarn publish doesn't support --provenance)
           npm publish --tag ${{ inputs.npm_tag }} --provenance --access public
 
       - name: Create GitHub Release (Dry Run)
