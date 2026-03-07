@@ -5,7 +5,7 @@ A powerful bottom sheet manager and router for React Native, inspired by [react-
 ## Features
 
 - 🎯 **Simple API** - Show/hide sheets from anywhere in your app
-- 🔄 **Stack Behaviors** - Control how sheets stack with `push` (experimental), `switch`, or `replace` behaviors
+- 🔄 **Stack Behaviors** - Control how sheets stack with `push`, `switch`, or `replace` behaviors
 - 🧭 **React Navigation Integration** - Full support for React Navigation v6/v7 and Expo Router
 - 📱 **iOS 18 Modal Animation** - Native-like modal sheet animations
 - 🎨 **TypeScript Support** - Full type safety with IntelliSense
@@ -25,58 +25,54 @@ npm install @niibase/bottom-sheet-manager
 `SheetManager` helps you save development time by allowing you to reuse modal sheets throughout your app without boilerplate.
 
 ```tsx
-import { BottomSheet, SheetManager } from '@niibase/bottom-sheet-manager';
-import type { SheetProps } from '@niibase/bottom-sheet-manager';
+import { BottomSheet, SheetManager } from "@niibase/bottom-sheet-manager";
+import type { SheetProps } from "@niibase/bottom-sheet-manager";
 ```
 
 Create your BottomSheet component:
 
 ```tsx
 function ExampleSheet({ id }: SheetProps<"example-sheet">) {
-  return (
-    <BottomSheet 
-      id={id}
-      snapPoints={['50%', '90%']}
-    >
-      <View>
-        <Text>Hello World</Text>
-      </View>
-    </BottomSheet>
-  );
+    return (
+        <BottomSheet id={id} snapPoints={["50%", "90%"]}>
+            <BottomSheet.View>
+                <Text>Hello World</Text>
+            </BottomSheet.View>
+        </BottomSheet>
+    );
 }
 
 export default ExampleSheet;
 ```
 
-Register your sheet in a `sheets.ts` file:
+Register your sheet **at module level** in a `sheets.ts` file (never inside JSX):
 
 ```ts
-import { registerSheet } from '@niibase/bottom-sheet-manager';
-import type { SheetDefinition } from '@niibase/bottom-sheet-manager';
-import ExampleSheet from './ExampleSheet';
+import type { SheetDefinition } from "@niibase/bottom-sheet-manager";
+import { registerSheet } from "@niibase/bottom-sheet-manager";
 
-registerSheet('example-sheet', ExampleSheet);
+import ExampleSheet from "./ExampleSheet";
+
+// ✅ Correct: register at module level
+registerSheet("example-sheet", ExampleSheet);
 
 // Extend types for IntelliSense
-declare module '@niibase/bottom-sheet-manager' {
-  interface Sheets {
-    'example-sheet': SheetDefinition;
-  }
+declare module "@niibase/bottom-sheet-manager" {
+    interface Sheets {
+        "example-sheet": SheetDefinition;
+    }
 }
 ```
 
-Wrap your app with `SheetProvider`:
+Import `sheets.ts` in your app entry point, then wrap your app with `SheetProvider`:
 
 ```tsx
-import { SheetProvider } from '@niibase/bottom-sheet-manager';
-import './sheets';
+import { SheetProvider } from "@niibase/bottom-sheet-manager";
+
+import "./sheets";
 
 function App() {
-  return (
-    <SheetProvider>
-      {/* your app components */}
-    </SheetProvider>
-  );
+    return <SheetProvider>{/* your app components */}</SheetProvider>;
 }
 ```
 
@@ -84,16 +80,23 @@ Show and hide sheets:
 
 ```tsx
 // Show a sheet
-SheetManager.show('example-sheet');
+SheetManager.show("example-sheet");
 
 // Show with payload
-SheetManager.show('example-sheet', { userId: 123 });
+SheetManager.show("example-sheet", { payload: { userId: 123 } });
 
 // Hide a sheet
-SheetManager.hide('example-sheet');
+SheetManager.hide("example-sheet");
 
 // Hide and get return value
-const result = await SheetManager.show('example-sheet');
+const result = await SheetManager.show("example-sheet");
+
+// Check if a sheet is visible
+SheetManager.isVisible("example-sheet"); // boolean
+
+// Get the sheet instance directly
+const instance = SheetManager.get("example-sheet");
+instance?.expand();
 ```
 
 ## Stack Behaviors
@@ -102,16 +105,16 @@ Control how sheets behave when opened on top of existing sheets:
 
 - **`switch`** (default): Dismisses the current sheet before showing the new one. Previous sheet is restored when new one closes.
 - **`replace`**: Swaps the current sheet's content with smooth crossfade animation. Previous sheet is removed from stack.
-- **`push`** (experimental): Pushes new sheet on top, creating a navigable stack. Previous sheet remains visible underneath.
+- **`push`**: Pushes new sheet on top, creating a navigable stack. Previous sheet remains visible underneath.
 
 ```tsx
 // Set stack behavior per sheet
-<BottomSheet 
-  id={id}
-  stackBehavior="push" // or "switch" or "replace"
-  snapPoints={['50%', '90%']}
+<BottomSheet
+    id={id}
+    stackBehavior="push" // or "switch" or "replace"
+    snapPoints={["50%", "90%"]}
 >
-  {/* content */}
+    {/* content */}
 </BottomSheet>
 ```
 
@@ -123,37 +126,38 @@ Full support for React Navigation v6/v7 and Expo Router. The first screen in the
 
 ```tsx
 import { Slot, withLayoutContext } from "expo-router";
+
 import {
-  createBottomSheetNavigator,
-  BottomSheetNavigationOptions,
-  BottomSheetNavigationEventMap,
-  BottomSheetNavigationState,
+    BottomSheetNavigationEventMap,
+    BottomSheetNavigationOptions,
+    BottomSheetNavigationState,
+    createBottomSheetNavigator,
 } from "@niibase/bottom-sheet-manager";
 
 const { Navigator } = createBottomSheetNavigator();
 const BottomSheet = withLayoutContext<
-  BottomSheetNavigationOptions,
-  typeof Navigator,
-  BottomSheetNavigationState<any>,
-  BottomSheetNavigationEventMap
+    BottomSheetNavigationOptions,
+    typeof Navigator,
+    BottomSheetNavigationState<any>,
+    BottomSheetNavigationEventMap
 >(Navigator);
 
 export const unstable_settings = {
-  initialRouteName: "index",
+    initialRouteName: "index",
 };
 
 export default function Layout() {
-  // SSR guard - navigator doesn't work on server
-  if (typeof window === "undefined") return <Slot />;
-  
-  return (
-    <BottomSheet
-      screenOptions={{
-        snapPoints: ['50%', '90%'],
-        // See: https://gorhom.github.io/react-native-bottom-sheet/modal/props/
-      }}
-    />
-  );
+    // SSR guard - navigator doesn't work on server
+    if (typeof window === "undefined") return <Slot />;
+
+    return (
+        <BottomSheet
+            screenOptions={{
+                snapPoints: ["50%", "90%"],
+                // See: https://gorhom.github.io/react-native-bottom-sheet/modal/props/
+            }}
+        />
+    );
 }
 ```
 
@@ -165,19 +169,19 @@ import { createBottomSheetNavigator } from "@niibase/bottom-sheet-manager";
 const { Navigator, Screen } = createBottomSheetNavigator();
 
 function App() {
-  return (
-    <Navigator>
-      <Screen name="Home" component={HomeScreen} />
-      <Screen
-        name="Details"
-        component={DetailsSheet}
-        options={{ 
-          snapPoints: ['50%', '100%'],
-          iosModalSheetTypeOfAnimation: true,
-        }}
-      />
-    </Navigator>
-  );
+    return (
+        <Navigator>
+            <Screen name="Home" component={HomeScreen} />
+            <Screen
+                name="Details"
+                component={DetailsSheet}
+                options={{
+                    snapPoints: ["50%", "100%"],
+                    enableBlurKeyboardOnGesture: true,
+                }}
+            />
+        </Navigator>
+    );
 }
 ```
 
@@ -189,51 +193,26 @@ Use the navigation object to control sheets programmatically:
 import { useBottomSheetNavigation } from "@niibase/bottom-sheet-manager";
 
 function MySheet() {
-  const navigation = useBottomSheetNavigation();
+    const navigation = useBottomSheetNavigation();
 
-  // Snap to a specific index
-  const handleExpand = () => {
-    navigation.snapTo(1); // Snap to second snap point
-  };
+    // Snap to a specific index
+    const handleExpand = () => {
+        navigation.snapTo(1); // Snap to second snap point
+    };
 
-  // Dismiss the current sheet
-  const handleDismiss = () => {
-    navigation.dismiss();
-  };
+    // Dismiss the current sheet
+    const handleDismiss = () => {
+        navigation.dismiss();
+    };
 
-  return (
-    <View>
-      <Button title="Expand" onPress={handleExpand} />
-      <Button title="Dismiss" onPress={handleDismiss} />
-    </View>
-  );
+    return (
+        <View>
+            <Button title="Expand" onPress={handleExpand} />
+            <Button title="Dismiss" onPress={handleDismiss} />
+        </View>
+    );
 }
 ```
-
-### Known Limitations
-
-**⚠️ Important:** When using the bottom sheet as a navigator, calling `BottomSheet.Screen` from the `Navigator` will cause the sheet to render immediately.
-
-To customize the sheet screen options (e.g., change `snapPoints`), you must do it within the screen component itself using `navigation.setOptions()`:
-
-```tsx
-import { useBottomSheetNavigation } from "@niibase/bottom-sheet-manager";
-import { useEffect } from "react";
-
-export default function ProfileSheet() {
-  const navigation = useBottomSheetNavigation();
-
-  useEffect(() => {
-    navigation.setOptions({ snapPoints: ["100%"] });
-  }, [navigation]);
-
-  return (
-    // Your sheet content
-  );
-}
-```
-
-This ensures that the sheet options are set after the component mounts, allowing you to customize the behavior per screen.
 
 ## Hooks
 
@@ -251,19 +230,19 @@ navigation.dismiss();
 
 ### `useSheetRef`
 
-Get a ref to control the sheet instance:
+Get a ref to control the sheet instance. Always use optional chaining (`?.`) since `current` can be null before the sheet is mounted:
 
 ```tsx
 import { useSheetRef } from "@niibase/bottom-sheet-manager";
 
 function MySheet({ id }: SheetProps<"my-sheet">) {
-  const ref = useSheetRef(id);
-  
-  // Control the sheet
-  ref.current?.expand();
-  ref.current?.collapse();
-  ref.current?.snapToIndex(1);
-  ref.current?.close({ value: "result" });
+    const ref = useSheetRef<"my-sheet">();
+
+    // Control the sheet — use ?. since current may be null
+    ref.current?.expand();
+    ref.current?.collapse();
+    ref.current?.snapToIndex(1);
+    ref.current?.close({ value: "result" });
 }
 ```
 
@@ -275,40 +254,39 @@ Access the payload passed when showing the sheet:
 import { useSheetPayload } from "@niibase/bottom-sheet-manager";
 
 function MySheet({ id }: SheetProps<"my-sheet">) {
-  const payload = useSheetPayload<"my-sheet">();
-  // payload is typed based on your SheetDefinition
+    const payload = useSheetPayload<"my-sheet">();
+    // payload is typed based on your SheetDefinition
 }
 ```
 
-### `useStackBehaviorContext`
+### `useSheetStackBehavior`
 
 Get the current stack behavior context:
 
 ```tsx
-import { useStackBehaviorContext } from "@niibase/bottom-sheet-manager";
+import { useSheetStackBehavior } from "@niibase/bottom-sheet-manager";
 
 function MySheet() {
-  const stackBehavior = useStackBehaviorContext();
-  // Returns: "push" | "replace" | "switch"
+    const { behavior, isTransitioning, previousSheetId } = useSheetStackBehavior();
+    // behavior: "push" | "replace" | "switch"
 }
 ```
 
 ### `useOnSheet`
 
-Subscribe to sheet events:
+Subscribe to sheet events. Takes the sheet id, an event type (`"show"`, `"hide"`, or `"onclose"`), and a listener:
 
 ```tsx
 import { useOnSheet } from "@niibase/bottom-sheet-manager";
 
 function MyComponent() {
-  useOnSheet("my-sheet", {
-    onShow: (payload) => {
-      console.log("Sheet shown with:", payload);
-    },
-    onHide: (returnValue) => {
-      console.log("Sheet hidden with:", returnValue);
-    },
-  });
+    useOnSheet("my-sheet", "show", (payload, context) => {
+        console.log("Sheet shown with:", payload);
+    });
+
+    useOnSheet("my-sheet", "onclose", (returnValue, context) => {
+        console.log("Sheet closed with:", returnValue);
+    });
 }
 ```
 
@@ -318,11 +296,11 @@ Enable native-like iOS 18 modal sheet animations:
 
 ```tsx
 <BottomSheet
-  id={id}
-  iosModalSheetTypeOfAnimation={true}
-  snapPoints={['50%', '90%', '100%']}
+    id={id}
+    iosModalSheetTypeOfAnimation={true}
+    snapPoints={["50%", "90%", "100%"]}
 >
-  {/* At 90% snap point, content behind scales down with border radius */}
+    {/* At 90% snap point, content behind scales down with border radius */}
 </BottomSheet>
 ```
 
@@ -330,27 +308,33 @@ Or in navigation options:
 
 ```tsx
 <Screen
-  name="Details"
-  component={DetailsSheet}
-  options={{
-    iosModalSheetTypeOfAnimation: true,
-    snapPoints: ['50%', '90%', '100%'],
-  }}
+    name="Details"
+    component={DetailsSheet}
+    options={{
+        iosModalSheetTypeOfAnimation: true,
+        snapPoints: ["50%", "90%", "100%"],
+    }}
 />
 ```
+
+> **Note:** When `iosModalSheetTypeOfAnimation` is `false` (the default), no animated wrappers are added to the component tree, keeping your app's layout overhead minimal.
 
 ## Advanced Features
 
 ### Custom Contexts
 
-Use separate contexts for nested sheets or modals:
+Use separate contexts for nested sheets or modals.
+
+> **Important:** Context names must be unique across all `SheetProvider` instances in your app.
 
 ```tsx
-// In a modal or nested sheet
-<SheetProvider context="modal-context">
-  {/* Register sheets for this context */}
-  {registerSheet('local-sheet', LocalSheet, 'modal-context')}
-</SheetProvider>
+// Register at module level — not inside JSX
+registerSheet("local-sheet", LocalSheet, "modal-context");
+
+// Then use the provider where you want the sheet to appear
+function MyModal() {
+    return <SheetProvider context="modal-context">{/* Modal content */}</SheetProvider>;
+}
 ```
 
 ### Sheet Instance Methods
@@ -358,7 +342,8 @@ Use separate contexts for nested sheets or modals:
 Control sheets programmatically:
 
 ```tsx
-const instance = SheetManager.get('example-sheet');
+// Get the sheet instance
+const instance = SheetManager.get("example-sheet");
 
 // Expand to maximum snap point
 instance?.expand();
@@ -370,10 +355,20 @@ instance?.collapse();
 instance?.snapToIndex(1);
 
 // Snap to specific position
-instance?.snapToPosition('75%');
+instance?.snapToPosition("75%");
 
 // Close with return value
 instance?.close({ value: { success: true } });
+```
+
+### Checking Visibility
+
+```tsx
+// Check if a sheet is currently open
+const isOpen = SheetManager.isVisible("example-sheet");
+
+// Check in a specific context
+const isOpen = SheetManager.isVisible("example-sheet", "modal-context");
 ```
 
 ### Animation Configuration
@@ -382,11 +377,22 @@ Customize animations:
 
 ```tsx
 instance?.expand({
-  animationConfigs: {
-    type: 'spring',
-    damping: 20,
-    stiffness: 90,
-  },
+    animationConfigs: {
+        type: "spring",
+        damping: 20,
+        stiffness: 90,
+    },
+});
+```
+
+### Reset (for Testing)
+
+```tsx
+import { SheetManager } from "@niibase/bottom-sheet-manager";
+
+// In your test setup/teardown
+afterEach(() => {
+    SheetManager.reset();
 });
 ```
 
@@ -396,45 +402,51 @@ instance?.expand({
 
 Global manager for showing and hiding sheets.
 
-```tsx
-// Show a sheet
-SheetManager.show<Id extends SheetIds>(
-  id: Id,
-  payload?: SheetPayload<Id>
-): Promise<SheetReturnValue<Id>>
-
-// Hide a sheet
-SheetManager.hide(id: SheetIds): void
-
-// Get sheet instance
-SheetManager.get(id: SheetIds): BottomSheetInstance<Id> | undefined
-```
+| Method      | Signature                                              | Description                                   |
+| ----------- | ------------------------------------------------------ | --------------------------------------------- |
+| `show`      | `show(id, options?) → Promise<ReturnValue>`            | Show a sheet, optionally with payload         |
+| `hide`      | `hide(id, options?) → Promise<ReturnValue>`            | Hide a specific sheet                         |
+| `hideAll`   | `hideAll(id?) → void`                                  | Hide all open sheets                          |
+| `get`       | `get(id, context?) → BottomSheetInstance \| undefined` | Get the sheet's imperative instance           |
+| `isVisible` | `isVisible(id, context?) → boolean`                    | Check if a sheet is currently visible         |
+| `replace`   | `replace(id, options?) → Promise<ReturnValue>`         | Show with `replace` stack behavior            |
+| `push`      | `push(id, options?) → Promise<ReturnValue>`            | Show with `push` stack behavior               |
+| `pop`       | `pop() → void`                                         | Close top-most pushed sheet                   |
+| `reset`     | `reset() → void`                                       | Reset all internal state (useful for testing) |
 
 ### `BottomSheet` Props
 
 All props from `@gorhom/bottom-sheet` are supported, plus:
 
-| Prop | Type | Default | Description |
-|------|------|---------|-------------|
-| `id` | `SheetID<SheetIds>` | - | Unique identifier for the sheet |
-| `stackBehavior` | `"push" \| "replace" \| "switch"` | `"switch"` | How sheets stack when opened (push is experimental) |
-| `iosModalSheetTypeOfAnimation` | `boolean` | `false` | Enable iOS 18 modal animation |
-| `clickThrough` | `boolean` | `false` | Allow tapping through backdrop |
-| `opacity` | `number` | `0.45` | Backdrop opacity |
-| `hardwareBackPressToClose` | `boolean` | `true` | Close on hardware back button |
-| `onClose` | `(data?: unknown) => unknown` | - | Callback when sheet closes |
-| `onBeforeShow` | `(data?: unknown) => void` | - | Callback before sheet shows |
+| Prop                           | Type                              | Default    | Description                                                                           |
+| ------------------------------ | --------------------------------- | ---------- | ------------------------------------------------------------------------------------- |
+| `id`                           | `SheetID<SheetIds>`               | -          | Unique identifier for the sheet                                                       |
+| `stackBehavior`                | `"push" \| "replace" \| "switch"` | `"switch"` | How sheets stack when opened                                                          |
+| `iosModalSheetTypeOfAnimation` | `boolean`                         | `false`    | Enable iOS 18 modal animation                                                         |
+| `clickThrough`                 | `boolean`                         | `false`    | Allow tapping through backdrop                                                        |
+| `opacity`                      | `number`                          | `0.45`     | Backdrop opacity                                                                      |
+| `hardwareBackPressToClose`     | `boolean`                         | `true`     | Close on hardware back button (Android)                                               |
+| `onClose`                      | `(data?) => ReturnValue \| void`  | -          | Callback when sheet closes; return a value to override what's sent back to the caller |
+| `onBeforeShow`                 | `(data?) => void`                 | -          | Callback before sheet shows                                                           |
+
+### `SheetProvider` Props
+
+| Prop          | Type             | Default     | Description                                                                                        |
+| ------------- | ---------------- | ----------- | -------------------------------------------------------------------------------------------------- |
+| `context`     | `string`         | `"global"`  | Unique name for this provider context                                                              |
+| `statusBar`   | `StatusBarStyle` | `"default"` | Status bar style when a full-screen sheet is open                                                  |
+| `scaleConfig` | `object`         | -           | Controls the iOS 18-style scale/translate/radius animation applied to the content behind the sheet |
 
 ### `BottomSheetNavigationOptions`
 
 Screen options for navigation-based sheets:
 
-| Option | Type | Default | Description |
-|--------|------|---------|-------------|
-| `snapPoints` | `Array<string \| number>` | `['66%']` | Snap points for the sheet |
-| `clickThrough` | `boolean` | `false` | Allow tapping through backdrop |
-| `iosModalSheetTypeOfAnimation` | `boolean` | `false` | Enable iOS 18 modal animation |
-| `opacity` | `number` | `0.45` | Backdrop opacity |
+| Option                         | Type                      | Default   | Description                    |
+| ------------------------------ | ------------------------- | --------- | ------------------------------ |
+| `snapPoints`                   | `Array<string \| number>` | `['66%']` | Snap points for the sheet      |
+| `clickThrough`                 | `boolean`                 | `false`   | Allow tapping through backdrop |
+| `iosModalSheetTypeOfAnimation` | `boolean`                 | `false`   | Enable iOS 18 modal animation  |
+| `opacity`                      | `number`                  | `0.45`    | Backdrop opacity               |
 
 ### Navigation Actions
 
@@ -456,7 +468,7 @@ navigation.dispatch(BottomSheetActions.remove());
 The source code for the example (showcase) app is under the [/example](/example/) directory. It includes:
 
 - Basic sheet usage
-- Stack behavior demos (push (experimental), replace, switch)
+- Stack behavior demos (push, replace, switch) including mixed stacks
 - React Navigation integration
 - iOS modal animation examples
 - Navigation actions and hooks usage
@@ -478,4 +490,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 [⬆ Back to Top](#bottom-sheet-router--manager)
 
 </div>
-
