@@ -25,16 +25,26 @@ export const PrivateManager = {
     context(options?: { context?: string; id?: string }) {
         if (!options) options = {};
         if (!options?.context) {
-            // If no context is provided, use the current top-most context
-            // to render the sheet.
-            for (const context of providerRegistryStack.slice().reverse()) {
-                // We only automatically select nested sheet providers.
-                if (
-                    context.startsWith("$$-auto") &&
-                    !context.includes(options?.id as string)
-                ) {
-                    options.context = context;
-                    break;
+            // First try to find a context where this sheet is registered
+            if (options?.id) {
+                for (const context of providerRegistryStack.slice().reverse()) {
+                    if (sheetsRegistry[context]?.[options.id]) {
+                        options.context = context;
+                        break;
+                    }
+                }
+            }
+
+            // Fall back to the top-most auto-generated nested context
+            if (!options.context) {
+                for (const context of providerRegistryStack.slice().reverse()) {
+                    if (
+                        context.startsWith("$$-auto") &&
+                        !context.includes(options?.id as string)
+                    ) {
+                        options.context = context;
+                        break;
+                    }
                 }
             }
         }
@@ -130,6 +140,16 @@ export const PrivateManager = {
     clearHistory: () => {
         PrivateManager.history = [];
     },
+
+    /**
+     * Reset all internal state. Useful for testing or HMR.
+     */
+    reset: () => {
+        ids.length = 0;
+        keys.length = 0;
+        for (const key in refs) delete refs[key];
+        PrivateManager.history = [];
+    },
 };
 
 class _SheetManager {
@@ -185,18 +205,21 @@ class _SheetManager {
 
             const sub = eventManager.subscribe(`onclose_${id}`, handler);
 
-            // Handle existing sheets based on stack behavior
-            const currentStack = PrivateManager.stack();
-            if (currentStack.length > 0) {
-                currentStack.forEach(({ id: sheetId, context }) => {
-                    eventManager.publish(
-                        `hide_${sheetId}`,
-                        undefined,
-                        context,
-                        true,
-                        behavior,
-                    );
-                });
+            // Handle existing sheets based on stack behavior.
+            // For "push" we do NOT hide existing sheets — they stay underneath.
+            if (behavior !== "push") {
+                const currentStack = PrivateManager.stack();
+                if (currentStack.length > 0) {
+                    currentStack.forEach(({ id: sheetId, context }) => {
+                        eventManager.publish(
+                            `hide_${sheetId}`,
+                            undefined,
+                            context,
+                            true,
+                            behavior,
+                        );
+                    });
+                }
             }
 
             // Check if the sheet is registered with any `SheetProviders`.
@@ -306,6 +329,7 @@ class _SheetManager {
     /**
      * Push a new sheet on top of the current one, creating a stack.
      * This is a convenience method for show() with stackBehavior: 'push'.
+     *
      */
     async push<SheetId extends keyof Sheets>(
         id: SheetId | (string & {}),
@@ -330,6 +354,19 @@ class _SheetManager {
     }
 
     /**
+     * Get the internal ref of a sheet instance.
+     *
+     * @param id Id of the sheet
+     * @param context Optional context of the SheetProvider
+     */
+    get<SheetId extends keyof Sheets>(
+        id: SheetId | (string & {}),
+        context?: string,
+    ): BottomSheetInstance<SheetId> | undefined {
+        return PrivateManager.get(id, context)?.current ?? undefined;
+    }
+
+    /**
      * Check if a specific sheet is currently visible.
      */
     isVisible<SheetId extends keyof Sheets>(
@@ -337,6 +374,13 @@ class _SheetManager {
         context?: string,
     ): boolean {
         return PrivateManager.isSheetVisible(id, context);
+    }
+
+    /**
+     * Reset all internal state. Useful for testing environments.
+     */
+    reset(): void {
+        PrivateManager.reset();
     }
 }
 

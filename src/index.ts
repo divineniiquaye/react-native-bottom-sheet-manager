@@ -1,12 +1,12 @@
 export { default as BottomSheet } from "./sheet";
-export { SheetManager } from "./manager";
+export { SheetManager, PrivateManager } from "./manager";
 export * from "./router";
 export * from "./types";
 export {
-  SheetProvider,
-  useSheetPayload,
-  useSheetRef,
-  useOnSheet,
-  useStackBehaviorContext,
-  registerSheet,
+    SheetProvider,
+    useSheetPayload,
+    useSheetRef,
+    useOnSheet,
+    useStackBehaviorContext as useSheetStackBehavior,
+    registerSheet,
 } from "./provider";

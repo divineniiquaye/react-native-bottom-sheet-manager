@@ -7,13 +7,20 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
+  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { BottomSheetModalProvider } from "@gorhom/bottom-sheet";
 import { StatusBar } from "react-native";
 import React from "react";
 
-import { BottomSheetInstance, SheetPayload, Sheets, StackBehavior } from "./types";
+import {
+  BottomSheetInstance,
+  SheetPayload,
+  SheetProviderProps,
+  Sheets,
+  StackBehavior,
+} from "./types";
 import { eventManager } from "./events";
 
 export const providerRegistryStack: string[] = [];
@@ -45,17 +52,8 @@ export function registerSheet<SheetId extends keyof Sheets = never>(
       ? (sheetsRegistry[context] = {})
       : sheetsRegistry[context];
     registry[id as string] = Sheet;
-    eventManager.publish(`${context}-on-register`);
+    eventManager.publishAsync(`${context}-on-register`);
   }
-}
-
-/**
- * Animation configuration for iOS modal sheet style animations.
- * @deprecated Use duration prop directly instead
- */
-export interface ModalSheetAnimationConfig {
-  /** Duration of the animation in milliseconds */
-  duration: number;
 }
 
 /**
@@ -63,29 +61,24 @@ export interface ModalSheetAnimationConfig {
  * `global`. However if you want to render a Sheet within another sheet or if you want to render
  * Sheets in a modal. You can use a separate Provider with a custom context value.
  *
- * For example
+ * > **Note:** Context names must be unique across all `SheetProvider` instances.
+ *
+ * @example
  * ```ts
  * // Define your SheetProvider in the component/modal where
  * // you want to show some Sheets.
  * <SheetProvider context="local-context" />
  *
- * // Then register your sheet when for example the
- * // Modal component renders.
- *
- * registerSheet('local-sheet', LocalSheet,'local-context');
- *
+ * // Then register your sheet at module level (outside JSX):
+ * registerSheet('local-sheet', LocalSheet, 'local-context');
  * ```
  */
 export function SheetProvider({
-  iosModalSheetTypeOfAnimation = false,
   context = "global",
-  duration = 150,
+  statusBar,
+  scaleConfig,
   children,
-}: React.PropsWithChildren<{
-  context?: string;
-  duration?: number;
-  iosModalSheetTypeOfAnimation?: boolean;
-}>) {
+}: SheetProviderProps) {
   const { top } = useSafeAreaInsets();
   const [, forceUpdate] = React.useReducer((x) => x + 1, 0);
   const sheetIds = Object.keys(sheetsRegistry[context] || sheetsRegistry["global"] || {});
@@ -94,33 +87,58 @@ export function SheetProvider({
   const isFullScreen = useSharedValue(-1);
   const colorStyle = useAnimatedStyle(() => ({
     flex: 1,
-    backgroundColor: withSpring(
-      interpolateColor(isFullScreen.value, [0, 1], ["transparent", "#000"]),
-      { duration },
+    backgroundColor: interpolateColor(
+      isFullScreen.value,
+      [0, 1],
+      ["transparent", "#000"],
     ),
   }));
-  const animatedStyle = useAnimatedStyle(
-    () => ({
+  const animatedStyle = useAnimatedStyle(() => {
+    const radius = interpolate(
+      isFullScreen.value,
+      [0, 0.3],
+      [0, scaleConfig?.borderRadius ?? 24],
+      "clamp",
+    );
+    const scale = interpolate(
+      isFullScreen.value,
+      [0.5, 0.8],
+      [1, scaleConfig?.scale ?? 0.92],
+      "clamp",
+    );
+    const translateY = interpolate(
+      isFullScreen.value,
+      [0.5, 0.7],
+      [0, top + (scaleConfig?.translateY ?? 5)],
+      "clamp",
+    );
+
+    return {
       flex: 1,
       overflow: "hidden",
-      borderRadius: interpolate(isFullScreen.value, [0, 0.8, 1], [0, 20, 24], "clamp"),
+      borderRadius:
+        scaleConfig?.animation?.type === "spring"
+          ? withSpring(radius, scaleConfig.animation.config)
+          : withTiming(radius, scaleConfig?.animation?.config ?? { duration: 200 }),
       transform: [
         {
-          scaleX: withSpring(
-            interpolate(isFullScreen.value, [0, 0.8], [1, 0.92], "clamp"),
-            { duration },
-          ),
+          scaleX:
+            scaleConfig?.animation?.type === "spring"
+              ? withSpring(scale, scaleConfig.animation.config)
+              : withTiming(scale, scaleConfig?.animation?.config ?? { duration: 200 }),
         },
         {
-          translateY: withSpring(
-            interpolate(isFullScreen.value, [0, 0.8, 1], [0, top, top + 5], "clamp"),
-            { duration, dampingRatio: 1.5 },
-          ),
+          translateY:
+            scaleConfig?.animation?.type === "spring"
+              ? withSpring(translateY, scaleConfig.animation.config)
+              : withTiming(
+                  translateY,
+                  scaleConfig?.animation?.config ?? { duration: 200 },
+                ),
         },
       ],
-    }),
-    [duration],
-  );
+    };
+  }, [top, scaleConfig]);
 
   // Since background color is white, we need to set status bar to light
   const setStatusBar = StatusBar.setBarStyle;
@@ -128,8 +146,11 @@ export function SheetProvider({
     () => isFullScreen.value,
     (currentValue) => {
       "worklet";
-      if (currentValue > -1) {
-        runOnJS(setStatusBar)(currentValue >= 0.5 ? "light-content" : "default");
+      if (currentValue >= 0) {
+        runOnJS(setStatusBar)(
+          currentValue >= 0.5 ? "light-content" : (statusBar ?? "default"),
+          true,
+        );
       }
     },
     [],
@@ -147,9 +168,7 @@ export function SheetProvider({
   }, [context, forceUpdate]);
 
   return (
-    <SheetAnimationContext.Provider
-      value={{ isFullScreen, iosModalSheetTypeOfAnimation, duration }}
-    >
+    <SheetSharedContext.Provider value={{ isFullScreen, topInset: top }}>
       <Animated.View style={colorStyle}>
         <Animated.View style={animatedStyle}>{children}</Animated.View>
       </Animated.View>
@@ -158,19 +177,18 @@ export function SheetProvider({
           <RenderSheet key={id} id={id} context={context} />
         ))}
       </BottomSheetModalProvider>
-    </SheetAnimationContext.Provider>
+    </SheetSharedContext.Provider>
   );
 }
+
 const ProviderContext = React.createContext("global");
 const SheetIDContext = React.createContext<string | undefined>(undefined);
-const SheetAnimationContext = React.createContext<{
-  iosModalSheetTypeOfAnimation: boolean;
+const SheetSharedContext = React.createContext<{
   isFullScreen: SharedValue<number>;
-  duration: number;
+  topInset: number;
 }>({
   isFullScreen: { value: 0 } as SharedValue<number>,
-  iosModalSheetTypeOfAnimation: false,
-  duration: 300,
+  topInset: 0,
 });
 
 export const SheetRefContext = React.createContext<
@@ -203,13 +221,14 @@ export const useSheetIDContext = () => React.useContext(SheetIDContext);
 /**
  * Get the current sheet animation context.
  */
-export const useSheetAnimationContext = () => React.useContext(SheetAnimationContext);
+export const useSheetSharedContext = () => React.useContext(SheetSharedContext);
 /**
  * Get stack behavior context for the current sheet.
  */
 export const useStackBehaviorContext = () => React.useContext(StackBehaviorContext);
 /**
  * Get the current Sheet's internal ref.
+ * Note: `current` may be null before the sheet is fully mounted.
  */
 export const useSheetRef = <
   SheetId extends keyof Sheets = never,

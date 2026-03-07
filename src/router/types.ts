@@ -7,8 +7,66 @@ import type {
     ParamListBase,
     RouteProp,
     StackActionHelpers,
+    StackNavigationState,
+    StackRouterOptions,
 } from "@react-navigation/native";
-import type { BottomSheetModalProps } from "@gorhom/bottom-sheet";
+import type { BottomSheetModalProps, SNAP_POINT_TYPE } from "@gorhom/bottom-sheet";
+
+/**
+ * Bottom-sheet-specific screen options.
+ * These only take effect when `presentation: "bottomSheet"`.
+ */
+export type BottomSheetScreenOptions = Omit<
+    BottomSheetModalProps,
+    // Remove props that are managed by the navigator
+    | "containerHeight"
+    | "snapPoints"
+    | "gestureEventsHandlersHook"
+    | "iosModalSheetTypeOfAnimation"
+    | "animatedPosition"
+    | "onBeforeShow"
+    | "onChange"
+    | "onClose"
+    | "onDismiss"
+    | "onAnimate"
+    | "children"
+    | "$modal"
+    | "waitFor"
+    | "simultaneousHandlers"
+> & {
+    /**
+     * Points for the bottom sheet to snap to.
+     * Accepts an array of numbers (pixels) or strings (percentages).
+     *
+     * @example
+     * snapPoints={[200, 500]}
+     * snapPoints={[200, '50%']}
+     * snapPoints={['100%']}
+     *
+     * @default ['66%']
+     */
+    snapPoints?: Array<string | number>;
+
+    /**
+     * When `true`, tapping on the backdrop will not dismiss the sheet.
+     * @default false
+     */
+    passThrough?: boolean;
+
+    /**
+     * Opacity of the backdrop overlay.
+     * @default 0.45
+     */
+    opacity?: number;
+};
+
+/**
+ * Navigation options for the bottom sheet navigator.
+ *
+ * The first screen is rendered as the base content.
+ * All subsequent screens are rendered as bottom sheets using these options.
+ */
+export type BottomSheetNavigationOptions = Partial<BottomSheetScreenOptions>;
 
 /**
  * Navigation events emitted by the bottom sheet navigator.
@@ -17,11 +75,32 @@ export type BottomSheetNavigationEventMap = {
     /**
      * Event emitted when a sheet is presented.
      */
-    sheetPresent: { data: undefined };
+    sheetPresent: { data: unknown };
     /**
      * Event emitted when a sheet is dismissed.
      */
-    sheetDismiss: { data: undefined };
+    sheetDismiss: { data: unknown };
+    /**
+     * Event emitted when a sheet changes between position/snap points
+     */
+    sheetOnChange: {
+        data: {
+            index: number;
+            position: number;
+            type: SNAP_POINT_TYPE;
+        };
+    };
+    /**
+     * Event emitted when a sheet animates between snap points.
+     */
+    sheetOnAnimate: {
+        data: {
+            fromIndex: number;
+            toIndex: number;
+            fromPosition: number;
+            toPosition: number;
+        };
+    };
 };
 
 /**
@@ -45,14 +124,15 @@ export type BottomSheetRoute<ParamList extends ParamListBase = ParamListBase> =
 
 /**
  * Navigation state type for the bottom sheet navigator.
+ *
+ * Extends `StackNavigationState` with bottom-sheet-specific route properties
+ * and a `"bottom-sheet"` type discriminator.
  */
-export type BottomSheetNavigationState<ParamList extends ParamListBase> = Omit<
-    NavigationState<ParamList>,
-    "routes" | "type"
-> & {
-    type: "bottom-sheet";
-    routes: BottomSheetRoute<ParamList>[];
-};
+export type BottomSheetNavigationState<ParamList extends ParamListBase = ParamListBase> =
+    Omit<StackNavigationState<ParamList>, "routes" | "type"> & {
+        type: "bottom-sheet";
+        routes: BottomSheetRoute<ParamList>[];
+    };
 
 /**
  * Action helpers available on the navigation object.
@@ -75,14 +155,14 @@ export type BottomSheetActionHelpers<ParamList extends ParamListBase> =
  * Navigation prop type for screens in the bottom sheet navigator.
  */
 export type BottomSheetNavigationProp<
-    ParamList extends ParamListBase,
+    ParamList extends ParamListBase = ParamListBase,
     RouteName extends keyof ParamList = string,
     NavigatorID extends string | undefined = undefined,
 > = NavigationProp<
     ParamList,
     RouteName,
     NavigatorID,
-    BottomSheetNavigationState<ParamList>,
+    BottomSheetNavigationState<ParamListBase>,
     BottomSheetNavigationOptions,
     BottomSheetNavigationEventMap
 > &
@@ -110,99 +190,24 @@ export type BottomSheetNavigationHelpers = NavigationHelpers<
     BottomSheetActionHelpers<ParamListBase>;
 
 /**
- * Configuration options for the bottom sheet navigator.
- */
-export type BottomSheetNavigationConfig = {
-    /**
-     * Whether to detach inactive sheets from the view hierarchy.
-     * @default false
-     */
-    detachInactiveScreens?: boolean;
-};
-
-/**
- * Screen options available for bottom sheet screens.
- */
-export type BottomSheetNavigationOptions = Omit<
-    BottomSheetModalProps,
-    // Remove props that are managed by the navigator
-    | "containerHeight"
-    | "snapPoints"
-    | "gestureEventsHandlersHook"
-    | "animatedPosition"
-    | "onChange"
-    | "onClose"
-    | "children"
-    | "$modal"
-    | "waitFor"
-    | "simultaneousHandlers"
-> & {
-    /**
-     * Points for the bottom sheet to snap to.
-     * Accepts an array of numbers (pixels) or strings (percentages).
-     *
-     * @example
-     * snapPoints={[200, 500]}
-     * snapPoints={[200, '50%']}
-     * snapPoints={['100%']}
-     *
-     * @default ['66%']
-     */
-    snapPoints?: Array<string | number>;
-
-    /**
-     * When `true`, tapping on the backdrop will not dismiss the sheet.
-     * @default false
-     */
-    clickThrough?: boolean;
-
-    /**
-     * Whether the bottom sheet is an iOS 18 modal sheet type of animation.
-     * When enabled at snap point 90%, the content behind the sheet scales down and gets a
-     * border radius, similar to iOS 18 system sheets.
-     * @default false
-     */
-    iosModalSheetTypeOfAnimation?: boolean;
-
-    /**
-     * Opacity of the backdrop overlay.
-     * @default 0.45
-     */
-    opacity?: number;
-};
-
-export type BottomSheetModalScreenProps = Omit<BottomSheetModalProps, "onDismiss"> & {
-    route: BottomSheetRoute;
-    navigation: BottomSheetNavigationHelpers;
-
-    clickThrough?: boolean;
-    opacity?: number;
-
-    /**
-     * Callback when sheet animation changes.
-     */
-    onSheetAnimate?: (from: number, to: number) => void;
-};
-
-/**
  * Props for the bottom sheet navigator component.
  */
 export type BottomSheetNavigatorProps = DefaultNavigatorOptions<
     ParamListBase,
-    undefined, // or your ID if you want a named ID, e.g. 'BottomSheetNavigator'
+    string | undefined,
     BottomSheetNavigationState<ParamListBase>,
     BottomSheetNavigationOptions,
     BottomSheetNavigationEventMap,
-    BottomSheetNavigationHelpers
+    BottomSheetNavigationProp<ParamListBase>
 > &
-    BottomSheetNavigationConfig;
+    StackRouterOptions;
 
 /**
  * Descriptor type for bottom sheet screens.
  */
 export type BottomSheetDescriptor = Descriptor<
     BottomSheetNavigationOptions,
-    BottomSheetNavigationProp<ParamListBase>,
+    BottomSheetNavigationProp<ParamListBase, string, undefined>,
     RouteProp<ParamListBase>
 >;
 
@@ -211,4 +216,17 @@ export type BottomSheetDescriptor = Descriptor<
  */
 export type BottomSheetDescriptorMap = {
     [key: string]: BottomSheetDescriptor;
+};
+
+export type BottomSheetModalScreenProps = Omit<BottomSheetModalProps, "onDismiss"> & {
+    route: BottomSheetRoute;
+    navigation: BottomSheetNavigationHelpers;
+
+    passThrough?: boolean;
+    opacity?: number;
+
+    /**
+     * Callback when sheet animation changes.
+     */
+    onSheetAnimate?: (from: number, to: number) => void;
 };

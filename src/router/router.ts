@@ -85,7 +85,10 @@ const ensureBaseRoute = <T extends { routes: { name: string }[] }>(
 
 export const BottomSheetRouter = (
     routerOptions: StackRouterOptions,
-): Router<BottomSheetNavigationState<ParamListBase>, BottomSheetActionType> => {
+): Router<
+    BottomSheetNavigationState<ParamListBase>,
+    BottomSheetActionType
+> => {
     const baseRouter = StackRouter(routerOptions) as unknown as Router<
         BottomSheetNavigationState<ParamListBase>,
         BottomSheetActionType
@@ -260,4 +263,5 @@ export const BottomSheetRouter = (
  */
 export const useBottomSheetNavigation = <
     T extends ParamListBase = ParamListBase,
->(): BottomSheetNavigationProp<T> => useNavigation<BottomSheetNavigationProp<T>>();
+>(): BottomSheetNavigationProp<T> =>
+    useNavigation<BottomSheetNavigationProp<T>>();

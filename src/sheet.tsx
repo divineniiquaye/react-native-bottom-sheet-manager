@@ -19,20 +19,18 @@ import {
   type NativeEventSubscription,
 } from "react-native";
 import {
-  Easing,
+  interpolate,
   useAnimatedReaction,
   useSharedValue,
-  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useTheme } from "@react-navigation/native";
 import React from "react";
 
 import {
   useProviderContext,
-  useSheetAnimationContext,
   useSheetIDContext,
   useSheetRef,
+  useSheetSharedContext,
   useStackBehaviorContext,
 } from "./provider";
 import { BottomSheetInstance, BottomSheetProps, SheetIds, StackBehavior } from "./types";
@@ -42,7 +40,7 @@ import { eventManager } from "./events";
 interface BottomSheetFC
   extends React.MemoExoticComponent<React.ForwardRefExoticComponent<BottomSheetProps>> {
   <Id extends SheetIds>(
-    props: BottomSheetProps & React.RefAttributes<BottomSheetInstance<Id>>,
+    props: BottomSheetProps<Id> & React.RefAttributes<BottomSheetInstance<Id>>,
   ): React.JSX.Element;
 
   // Components
@@ -57,6 +55,9 @@ interface BottomSheetFC
   Backdrop: typeof BottomSheetBackdrop;
   TextInput: typeof BottomSheetTextInput;
 }
+
+const FULL_SCREEN_POINTS: (string | number)[] =
+  Platform.OS === "ios" ? ["%90", "90%"] : ["%93", "93%"];
 
 const useSheetManager = ({
   id,
@@ -96,6 +97,7 @@ const useSheetManager = ({
         },
       ),
     ];
+
     return () => {
       hasShownRef.current = false;
       subscriptions.forEach((s) => s?.unsubscribe?.());
@@ -107,22 +109,21 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
   (
     {
       children,
-      snapPoints,
       onClose,
       onBeforeShow,
       stackBehavior = "switch",
       hardwareBackPressToClose = true,
       enableDynamicSizing = false,
       handleIndicatorStyle,
-      iosModalSheetTypeOfAnimation: pageAnimation,
+      iosModalSheetTypeOfAnimation,
+      snapPoints: defaultSnapPoints,
       animatedIndex: defaultAnimatedIndex,
       backgroundStyle,
       onAnimate,
       handleStyle,
       style,
-      clickThrough,
+      passThrough,
       opacity,
-
       ...props
     },
     ref,
@@ -131,44 +132,38 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
     const currentCtx = useProviderContext();
     const stackContext = useStackBehaviorContext();
 
-    const { isFullScreen, iosModalSheetTypeOfAnimation, duration } =
-      useSheetAnimationContext();
     const animatedIndex = useSharedValue(0);
-    const previousIndex = useSharedValue(-1);
 
     const [currentStackBehavior, setCurrentStackBehavior] =
       React.useState<StackBehavior>(stackBehavior);
     const isPushed = currentStackBehavior === "push";
 
-    const { colors } = useTheme();
     const { bottom, left, right } = useSafeAreaInsets();
 
-    const themeBackgroundStyle = React.useMemo(
-      () => ({
-        borderCurve: "continuous" as unknown as undefined,
-        backgroundColor: colors.card,
-        borderTopLeftRadius: 20,
-        borderTopRightRadius: 20,
-      }),
-      [colors.card],
-    );
-    const themeHandleIndicatorStyle = React.useMemo(
-      () => ({
-        backgroundColor: colors.border,
-        height: 5,
-        width: 50,
-      }),
-      [colors.border],
-    );
-
     const defaultStyle = React.useMemo(
-      () => ({
-        paddingBottom: bottom,
-        paddingLeft: left,
-        paddingRight: right,
-      }),
+      () => ({ paddingBottom: bottom, paddingLeft: left, paddingRight: right }),
       [bottom, left, right],
     );
+
+    const { isFullScreen } = useSheetSharedContext();
+    const [snapPoints, fullScreenIndex] = React.useMemo(() => {
+      let resolved = defaultSnapPoints;
+
+      if (
+        Platform.OS === "android" &&
+        iosModalSheetTypeOfAnimation &&
+        Array.isArray(resolved)
+      ) {
+        resolved = resolved.map((p) => (p === "90%" || p === "%90" ? "93%" : p));
+      }
+
+      const fullScreenIndex =
+        resolved instanceof Array
+          ? resolved.findIndex((p) => FULL_SCREEN_POINTS.includes(p))
+          : resolved?.value?.findIndex((p) => FULL_SCREEN_POINTS.includes(p)) || -1;
+
+      return [resolved, fullScreenIndex] as const;
+    }, [defaultSnapPoints, iosModalSheetTypeOfAnimation]);
 
     const valueRef = React.useRef<unknown>(null);
     const bottomSheetRef = React.useRef<BottomSheetModal>(null);
@@ -179,15 +174,27 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
     const id = useSheetIDContext();
     const sheetId = props.id || id;
 
+    const hideSheetRef = React.useRef<
+      (
+        data?: unknown,
+        fromManager?: boolean,
+        dismiss?: boolean,
+        incomingBehavior?: StackBehavior,
+      ) => void
+    >(null!);
+
     useSheetManager({
       id: sheetId,
       onHide: (data, dismiss, behavior) => {
+        // Update state for future renders, but also pass behavior directly
+        // so hideSheet doesn't read a stale closure value (React state update
+        // is async — hideSheet runs before the re-render).
         if (behavior) setCurrentStackBehavior(behavior);
-        hideSheet(data, true, dismiss);
+        hideSheetRef.current(data, true, dismiss, behavior);
       },
       onBeforeShow: (data, behavior) => {
         if (behavior) setCurrentStackBehavior(behavior);
-        onBeforeShow?.(data);
+        onBeforeShow?.(data as never);
         valueRef.current = undefined;
         currentSheetRef.current = getInstance();
       },
@@ -204,98 +211,90 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
     useAnimatedReaction(
       () => animatedIndex.value,
       (index) => {
-        ("worklet");
+        "worklet";
         if (defaultAnimatedIndex) {
           defaultAnimatedIndex.set(index);
         }
 
-        if (!iosModalSheetTypeOfAnimation && !pageAnimation) {
-          if (isFullScreen.value > 0) isFullScreen.set(0);
-          previousIndex.set(index);
-          return;
-        }
-
-        if (isFullScreen.value < 0) {
-          isFullScreen.set(0);
-        }
-
-        const isClosing =
-          index < 0 || (previousIndex.value >= 0 && index < previousIndex.value - 0.05);
-        previousIndex.set(index);
-
-        if (isClosing) {
-          if (isFullScreen.value > 0.01) {
-            isFullScreen.set(
-              withTiming(0, {
-                duration: duration * 0.85,
-                easing: Easing.bezier(0.25, 0.1, 0.25, 1),
-              }),
-            );
-          }
-          return;
-        }
-
-        const points: (string | number)[] = ["%90", "90%"];
-        const fullScreenIndex =
-          snapPoints instanceof Array
-            ? snapPoints.findIndex((p) => points.includes(p))
-            : snapPoints?.value?.findIndex((p) => points.includes(p)) || -1;
-
-        if (index >= fullScreenIndex - 0.5 && index <= fullScreenIndex + 0.5) {
-          isFullScreen.set(1);
-        } else if (index >= 0) {
-          isFullScreen.set(0);
+        if (iosModalSheetTypeOfAnimation) {
+          isFullScreen.set(
+            interpolate(
+              index,
+              [fullScreenIndex - 1, fullScreenIndex, fullScreenIndex + 1],
+              [0, 1, 0],
+            ),
+          );
         }
       },
-      [snapPoints, iosModalSheetTypeOfAnimation, pageAnimation, duration],
+      [iosModalSheetTypeOfAnimation],
     );
 
     const hideSheet = React.useCallback(
-      (data?: unknown, fromManager?: boolean, dismiss?: boolean) => {
+      (
+        data?: unknown,
+        fromManager?: boolean,
+        dismiss?: boolean,
+        incomingBehavior?: StackBehavior,
+      ) => {
+        // Use the freshly-delivered behavior from the event when available.
+        // currentStackBehavior comes from React state which may not have flushed
+        // yet when this callback fires synchronously from the manager.
+        const activeBehavior = incomingBehavior ?? currentStackBehavior;
+
         let value = data ?? valueRef.current;
 
         hardwareBackPressEvent.current?.remove();
 
-        const closeValue = onClose?.(value);
+        const closeValue = onClose?.(value as never);
         if (closeValue !== undefined) value = closeValue;
 
-        if (dismiss && currentStackBehavior === "push") {
+        if (dismiss && activeBehavior === "push") {
+          // For push behavior, a "dismiss" event means another sheet wants to
+          // appear on top — do not close this sheet.
           if (fromManager) valueRef.current = data;
           return;
         }
 
-        if (currentStackBehavior !== "replace" || !dismiss) {
+        if (activeBehavior !== "replace" || !dismiss) {
           bottomSheetRef.current?.close();
         }
 
         if (sheetId) {
           const hasHistory = PrivateManager.history.length > 0;
-          const shouldRestorePrevious = currentStackBehavior !== "replace";
+          const shouldRestorePrevious = activeBehavior !== "replace";
 
           eventManager.publish(
             `onclose_${sheetId}`,
             value,
             currentCtx,
             hasHistory || !!dismiss,
-            currentStackBehavior,
+            activeBehavior,
           );
 
           if (shouldRestorePrevious) {
             if (dismiss) {
-              PrivateManager.history.push({
-                id: sheetId,
-                context: currentCtx,
-                behavior: currentStackBehavior,
-              });
+              // it will surface naturally when the push sheet is closed.
+              if (activeBehavior !== "push") {
+                PrivateManager.history.push({
+                  id: sheetId,
+                  context: currentCtx,
+                  behavior: activeBehavior,
+                });
+              }
             } else if (hasHistory) {
-              const prev = PrivateManager.history.pop()!;
-              eventManager.publish(
-                `show_wrap_${prev.id}`,
-                undefined,
-                prev.context,
-                true,
-                prev.behavior,
+              const otherSheetsStillOpen = PrivateManager.stack().some(
+                (s) => !(s.id === sheetId && s.context === currentCtx),
               );
+              if (!otherSheetsStillOpen) {
+                const prev = PrivateManager.history.pop()!;
+                eventManager.publish(
+                  `show_wrap_${prev.id}`,
+                  undefined,
+                  prev.context,
+                  true,
+                  prev.behavior,
+                );
+              }
             }
           }
 
@@ -306,6 +305,10 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
       },
       [sheetId, currentCtx, onClose, currentStackBehavior],
     );
+
+    React.useEffect(() => {
+      hideSheetRef.current = hideSheet;
+    }, [hideSheet]);
 
     const getInstance = React.useCallback(
       (): BottomSheetInstance => ({
@@ -331,9 +334,7 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
 
     React.useEffect(() => {
       if (sheetId) {
-        PrivateManager.registerRef(sheetId, currentCtx, {
-          current: getInstance(),
-        } as React.RefObject<BottomSheetInstance>);
+        PrivateManager.registerRef(sheetId, currentCtx, { current: getInstance() });
       }
       currentSheetRef.current = getInstance();
     }, [currentCtx, getInstance, sheetId, currentSheetRef]);
@@ -343,7 +344,9 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
         hardwareBackPressEvent.current = BackHandler.addEventListener(
           "hardwareBackPress",
           () => {
-            bottomSheetRef.current?.close();
+            // Go through hideSheet so internal state (PrivateManager, events,
+            // history) is updated correctly — not just the visual sheet.
+            hideSheetRef.current(undefined, true, false);
             return true;
           },
         );
@@ -354,13 +357,10 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
 
     React.useImperativeHandle(ref, getInstance, [getInstance]);
 
-    const zIndex = React.useMemo(() => {
-      if (!sheetId) return 0;
-      if (isPushed) {
-        return PrivateManager.zIndex(sheetId, currentCtx);
-      }
-      return 0;
-    }, [sheetId, isPushed, currentCtx]);
+    const zIndex = React.useMemo(
+      () => (isPushed && sheetId ? PrivateManager.zIndex(sheetId, currentCtx) : 0),
+      [sheetId, isPushed, currentCtx],
+    );
 
     const backdropOpacity = React.useMemo(() => {
       if (isPushed && stackContext.previousSheetId) {
@@ -375,37 +375,25 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
           enableDynamicSizing={enableDynamicSizing}
           backdropComponent={(backdropProps) => (
             <BottomSheetBackdrop
-              enableTouchThrough={!!clickThrough}
+              enableTouchThrough={!!passThrough}
               opacity={backdropOpacity}
               disappearsOnIndex={-1}
               appearsOnIndex={0}
               {...backdropProps}
             />
           )}
-          onAnimate={(from, to, ...args) => {
-            const snapPointLen = Array.isArray(snapPoints)
-              ? snapPoints.length
-              : (snapPoints?.value?.length ?? 0);
-
-            if (to >= isFullScreen.value && to > snapPointLen - 1) {
-              isFullScreen.set(0);
-            } else if (to > 0 && to === previousIndex.value && isFullScreen.value === 0) {
-              isFullScreen.set(1);
-            }
-
-            onAnimate?.(from, to, ...args);
-          }}
           topInset={0}
           bottomInset={0}
           {...props}
           ref={bottomSheetRef}
           onClose={hideSheet}
+          onAnimate={onAnimate}
           animatedIndex={animatedIndex}
           style={[defaultStyle, style]}
-          snapPoints={enableDynamicSizing ? undefined : (snapPoints ?? ["66%"])}
-          handleIndicatorStyle={[themeHandleIndicatorStyle, handleIndicatorStyle]}
-          backgroundStyle={[themeBackgroundStyle, backgroundStyle]}
-          handleStyle={[themeBackgroundStyle, handleStyle]}
+          snapPoints={enableDynamicSizing ? undefined : snapPoints}
+          handleIndicatorStyle={handleIndicatorStyle}
+          backgroundStyle={backgroundStyle}
+          handleStyle={handleStyle}
         >
           {children}
         </RNBottomSheet>
