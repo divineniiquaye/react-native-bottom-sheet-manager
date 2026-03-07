@@ -8,10 +8,8 @@ const __dirname = dirname(__filename);
 
 // Get the package root (one level up from scripts/)
 const packageRoot = dirname(__dirname);
-const maybeNodeModules = resolve(packageRoot, "../");
-const isInNodeModules =
-    maybeNodeModules.endsWith("node_modules") ||
-    maybeNodeModules.endsWith("node_modules/@niibase");
+const maybeNodeModules = resolve(packageRoot, "../../");
+const isInNodeModules = maybeNodeModules.endsWith("node_modules")
 
 if (isInNodeModules) {
     // Fix keyboard not closing issue: https://github.com/gorhom/react-native-bottom-sheet/pull/2511
