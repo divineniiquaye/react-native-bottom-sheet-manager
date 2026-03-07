@@ -4,6 +4,7 @@
   "main": "expo-router/entry",
   "private": true,
   "scripts": {
+    "postinstall": "patch-package",
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
@@ -11,21 +12,22 @@
     "doctor": "npx expo-doctor"
   },
   "dependencies": {
-    "@gorhom/bottom-sheet": "^5.2.6",
+    "@gorhom/bottom-sheet": "^5.2.8",
     "@react-navigation/native": "^7.1.9",
     "expo": "~54.0.21",
     "expo-linking": "~8.0.8",
     "expo-router": "~6.0.14",
+    "expo-status-bar": "~3.0.9",
     "lucide-react-native": "~0.552.0",
     "react": "19.1.0",
     "react-dom": "19.1.0",
-    "react-native": "0.81.1",
+    "react-native": "0.81.5",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-reanimated": "~4.1.0",
     "react-native-safe-area-context": "~5.6.0",
-    "react-native-screens": "~4.15.4",
-    "react-native-svg": "15.13.0",
-    "react-native-worklets": "~0.5.0"
+    "react-native-screens": "~4.16.0",
+    "react-native-svg": "15.12.1",
+    "react-native-worklets": "0.5.2"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
@@ -33,6 +35,7 @@
     "@types/react": "~19.1.10",
     "babel-loader": "^10.0.0",
     "babel-plugin-module-resolver": "^5.0.0",
+    "patch-package": "^8.0.1",
     "typescript": "~5.9.2"
   },
   "engines": {
