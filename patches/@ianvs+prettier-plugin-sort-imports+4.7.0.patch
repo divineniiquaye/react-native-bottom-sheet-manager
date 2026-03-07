@@ -1,0 +1,96 @@
+diff --git a/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/index.js b/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/index.js
+index 9ba86e2..30be8a3 100644
+--- a/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/index.js
++++ b/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/index.js
+@@ -45,6 +45,12 @@ exports.options = {
+         default: [{ value: [] }],
+         description: 'Array of globs for side-effect-only imports that are considered safe to sort.',
+     },
++    importOrderSortByLength: {
++        type: 'boolean',
++        category: 'Global',
++        default: false,
++        description: 'Provide a boolean flag to sort imports by length (descending).',
++    },
+ };
+ const getEmberPlugin = () => {
+     try {
+diff --git a/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/natural-sort/index.js b/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/natural-sort/index.js
+index dfb323e..8ad27f0 100644
+--- a/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/natural-sort/index.js
++++ b/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/natural-sort/index.js
+@@ -2,6 +2,7 @@
+ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.naturalSort = naturalSort;
+ exports.naturalSortCaseSensitive = naturalSortCaseSensitive;
++exports.sortByLineCount = sortByLineCount;
+ function naturalSort(a, b) {
+     const left = typeof a === 'string' ? a : String(a);
+     // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Intl/Collator/Collator#syntax
+@@ -12,6 +13,16 @@ function naturalSort(a, b) {
+     };
+     return left.localeCompare(b, 'en', sortOptions);
+ }
++/**
++ * Compares two import declarations by their line count.
++ * The one with fewer lines comes first. If equal, sorts descending.
++ */
++function sortByLineCount(a, b) {
++    const lenA = (a.end || 0) - (a.start || 0);
++    const lenB = (b.end || 0) - (b.start || 0);
++    // If line counts are equal, sort descending
++    return lenB - lenA || naturalSort(b.source.value, a.source.value);
++}
+ /**
+  * Using a custom comparison function here, as `String.localeCompare` does not
+  * support sorting characters with all uppercase letters before lowercase
+diff --git a/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/utils/get-sorted-nodes-by-import-order.js b/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/utils/get-sorted-nodes-by-import-order.js
+index 686cef3..251ce34 100644
+--- a/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/utils/get-sorted-nodes-by-import-order.js
++++ b/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/utils/get-sorted-nodes-by-import-order.js
+@@ -13,7 +13,7 @@ const normalize_plugin_options_1 = require("./normalize-plugin-options");
+  * @param originalNodes A subset (of all import nodes) that should be sorted.
+  * @param options Options to influence the behavior of the sorting algorithm.
+  */
+-const getSortedNodesByImportOrder = (originalNodes, { importOrder, importOrderCaseSensitive, }) => {
++const getSortedNodesByImportOrder = (originalNodes, { importOrder, importOrderCaseSensitive, importOrderSortByLength, }) => {
+     if (process.env.NODE_ENV === 'test' &&
+         JSON.stringify(importOrder) !==
+             JSON.stringify(normalize_plugin_options_1.testingOnly.normalizeImportOrderOption(importOrder))) {
+@@ -62,6 +62,7 @@ const getSortedNodesByImportOrder = (originalNodes, { importOrder, importOrderCa
+             continue;
+         const sortedInsideGroup = (0, get_sorted_nodes_group_1.getSortedNodesGroup)(groupNodes, {
+             importOrderCaseSensitive,
++            importOrderSortByLength,
+         });
+         // Sort the import specifiers
+         sortedInsideGroup.forEach((node) => (0, get_sorted_import_specifiers_1.getSortedImportSpecifiers)(node, { importOrderCaseSensitive }));
+diff --git a/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/utils/get-sorted-nodes-group.js b/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/utils/get-sorted-nodes-group.js
+index 455ac0c..95d3b34 100644
+--- a/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/utils/get-sorted-nodes-group.js
++++ b/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/utils/get-sorted-nodes-group.js
+@@ -3,7 +3,11 @@ Object.defineProperty(exports, "__esModule", { value: true });
+ exports.getSortedNodesGroup = void 0;
+ const natural_sort_1 = require("../natural-sort");
+ const getSortedNodesGroup = (imports, options) => {
+-    const { importOrderCaseSensitive } = options || {};
++    const { importOrderCaseSensitive, importOrderSortByLength } = options || {};
++    if (importOrderSortByLength) {
++        // Sort by line count if the option is enabled
++        return imports.sort((a, b) => (0, natural_sort_1.sortByLineCount)(a, b));
++    }
+     const sortFn = importOrderCaseSensitive
+         ? natural_sort_1.naturalSortCaseSensitive
+         : natural_sort_1.naturalSort;
+diff --git a/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/utils/normalize-plugin-options.js b/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/utils/normalize-plugin-options.js
+index e6dd983..59697eb 100644
+--- a/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/utils/normalize-plugin-options.js
++++ b/node_modules/@ianvs/prettier-plugin-sort-imports/lib/src/utils/normalize-plugin-options.js
+@@ -79,6 +79,7 @@ function examineAndNormalizePluginOptions(options) {
+         importOrderCombineTypeAndValueImports,
+         importOrderCaseSensitive: !!options.importOrderCaseSensitive,
+         importOrderSafeSideEffects: options.importOrderSafeSideEffects,
++        importOrderSortByLength: !!options.importOrderSortByLength,
+         hasAnyCustomGroupSeparatorsInImportOrder: importOrder.some(isCustomGroupSeparator),
+         // Now that the regex for <BUILTIN_MODULES> is present, we can check if the user
+         // configured a separator before <BUILTIN_MODULES>

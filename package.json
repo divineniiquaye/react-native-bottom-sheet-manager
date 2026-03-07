@@ -14,9 +14,10 @@
     "build": "bob build && yarn copy-dts && yarn delete-dts.js",
     "copy-dts": "copyfiles -u 1 \"src/**/*.d.ts\" lib/typescript",
     "delete-dts.js": "find ./lib/commonjs -name '*.d.js*' -delete && find ./lib/module -name '*.d.js*' -delete",
-    "release": "rm -rf lib && yarn build && release-it",
+    "postinstall": "node scripts/postinstall.mjs",
+    "bootstrap": "yarn install && yarn example",
     "example": "yarn --cwd example",
-    "bootstrap": "yarn install && yarn example"
+    "patch": "patch-package"
   },
   "repository": {
     "type": "git",
@@ -49,13 +50,13 @@
     "LICENSE"
   ],
   "peerDependencies": {
-    "@react-navigation/native": ">=6.0.0 || >=7.0.0-",
+    "@react-navigation/native": ">=7.1.8",
     "@types/react": "*",
     "@types/react-native": "*",
     "react": "*",
     "react-native": "*",
-    "react-native-gesture-handler": ">=2.16.1",
-    "react-native-reanimated": ">=3.16.0 || >=4.0.0-",
+    "react-native-gesture-handler": ">=2.28.0",
+    "react-native-reanimated": ">=3.16.0 || >=4.0.0",
     "react-native-safe-area-context": "*"
   },
   "peerDependenciesMeta": {
@@ -67,27 +68,25 @@
     }
   },
   "dependencies": {
-    "@gorhom/bottom-sheet": "^5.2.6",
+    "@gorhom/bottom-sheet": "^5.2.8",
     "nanoid": "^5.1.6"
   },
   "devDependencies": {
-    "@commitlint/cli": "^19.8.1",
-    "@commitlint/config-conventional": "^19.8.1",
-    "@ianvs/prettier-plugin-sort-imports": "file:patched/prettier-plugin-sort-imports",
-    "@react-navigation/native": "^7.1.9",
-    "@release-it/conventional-changelog": "^10.0.1",
+    "@ianvs/prettier-plugin-sort-imports": "4.7.0",
+    "@react-navigation/native": "^7.1.8",
     "@types/react": "~18.3.12",
     "@types/react-native": "~0.73.0",
     "copyfiles": "^2.4.1",
     "metro-react-native-babel-preset": "^0.77.0",
+    "patch-package": "^8.0.1",
     "prettier": "3.6.2",
     "react": "18.3.1",
     "react-native": "0.76.0",
     "react-native-builder-bob": "^0.23.2",
-    "react-native-gesture-handler": "~2.20.2",
+    "react-native-gesture-handler": "~2.28.0",
     "react-native-reanimated": "~3.19.1",
     "react-native-safe-area-context": "~5.6.0",
-    "release-it": "^19.0.4",
+    "react-native-screens": "~4.16.0",
     "typescript": "^5.8.3"
   },
   "react-native-builder-bob": {
