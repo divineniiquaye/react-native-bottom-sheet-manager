@@ -1,18 +1,11 @@
 import { Camera, Edit2, Mail, MapPin, Phone, X } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
-import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
-import React, { useEffect } from "react";
+import React from "react";
 import { router } from "expo-router";
 
-import { BottomSheet, useBottomSheetNavigation } from "@niibase/bottom-sheet-manager";
+import { BottomSheet } from "@niibase/bottom-sheet-manager";
 
 export default function ProfileSheet() {
-  const navigation = useBottomSheetNavigation();
-
-  useEffect(() => {
-    navigation.setOptions({ snapPoints: ["100%"] });
-  }, [navigation]);
-
   return (
     <BottomSheet.ScrollView
       style={styles.container}
@@ -23,7 +16,7 @@ export default function ProfileSheet() {
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Profile</Text>
-          <Pressable style={styles.closeButton} onPress={() => router.back()}>
+          <Pressable style={styles.closeButton} onPress={router.back}>
             <X size={20} color="#64748B" />
           </Pressable>
         </View>

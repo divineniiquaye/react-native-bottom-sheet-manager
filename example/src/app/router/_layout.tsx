@@ -14,8 +14,8 @@ const { Navigator } = createBottomSheetNavigator();
  * Bottom Sheet Navigator with Expo Router
  *
  * This layout demonstrates how to use the bottom sheet navigator with expo-router.
- * The first screen (index) is the main content, and subsequent screens are rendered
- * as bottom sheets.
+ * The first screen (index) is the main content rendered by NativeStackView,
+ * and subsequent screens are rendered as bottom sheet modals.
  */
 const BottomSheet = withLayoutContext<
   BottomSheetNavigationOptions,
@@ -41,6 +41,18 @@ export default function SheetsLayout() {
         enablePanDownToClose: true,
         enableDynamicSizing: false,
       }}
-    />
+    >
+      <BottomSheet.Screen name="index" />
+      <BottomSheet.Screen name="profile" options={{ snapPoints: ["100%"] }} />
+      <BottomSheet.Screen name="settings" options={{ snapPoints: ["60%", "90%"] }} />
+      <BottomSheet.Screen
+        name="comments"
+        options={{
+          snapPoints: ["65%", "90%"],
+          keyboardBlurBehavior: "restore",
+          enableBlurKeyboardOnGesture: true,
+        }}
+      />
+    </BottomSheet>
   );
 }

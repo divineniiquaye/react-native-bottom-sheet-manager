@@ -10,17 +10,12 @@ import {
   X,
 } from "lucide-react-native";
 import { Pressable, StyleSheet, Switch, Text, View } from "react-native";
-import React, { useEffect } from "react";
-import { router } from "expo-router";
+import React from "react";
 
 import { BottomSheet, useBottomSheetNavigation } from "@niibase/bottom-sheet-manager";
 
 export default function SettingsSheet() {
   const navigation = useBottomSheetNavigation();
-
-  useEffect(() => {
-    navigation.setOptions({ snapPoints: ["60%", "90%"] });
-  }, [navigation]);
 
   const [darkMode, setDarkMode] = React.useState(false);
   const [notifications, setNotifications] = React.useState(true);
@@ -35,7 +30,7 @@ export default function SettingsSheet() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Settings</Text>
-        <Pressable style={styles.closeButton} onPress={() => router.back()}>
+        <Pressable style={styles.closeButton} onPress={navigation.goBack}>
           <X size={20} color="#64748B" />
         </Pressable>
       </View>

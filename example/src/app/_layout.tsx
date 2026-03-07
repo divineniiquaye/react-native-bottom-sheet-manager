@@ -13,7 +13,7 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <ThemeProvider value={DefaultTheme}>
-          <SheetProvider>
+          <SheetProvider statusBar="dark-content">
             <Stack screenOptions={{ headerShown: false }} />
           </SheetProvider>
         </ThemeProvider>

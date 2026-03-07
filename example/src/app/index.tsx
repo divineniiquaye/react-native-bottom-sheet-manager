@@ -1,6 +1,3 @@
-import { Alert, Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
 import {
   ArrowRight,
   Compass,
@@ -10,6 +7,10 @@ import {
   RefreshCw,
   Sparkles,
 } from "lucide-react-native";
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { StatusBar } from "expo-status-bar";
+import { useRouter } from "expo-router";
 import React from "react";
 
 import { SheetManager } from "@niibase/bottom-sheet-manager";
@@ -19,7 +20,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar style="dark" />
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.content}
@@ -35,10 +36,7 @@ export default function HomeScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Basic</Text>
           <Pressable
-            style={({ pressed }) => [
-              styles.card,
-              pressed && styles.cardPressed,
-            ]}
+            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
             onPress={async () => {
               const result = await SheetManager.show("example-sheet");
               if (typeof result === "number") {
@@ -64,10 +62,7 @@ export default function HomeScreen() {
           <Text style={styles.sectionTitle}>Stack Behaviors</Text>
 
           <Pressable
-            style={({ pressed }) => [
-              styles.card,
-              pressed && styles.cardPressed,
-            ]}
+            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
             onPress={() => {
               SheetManager.show("switch-demo-1");
             }}
@@ -77,18 +72,13 @@ export default function HomeScreen() {
             </View>
             <View style={styles.cardContent}>
               <Text style={styles.cardTitle}>Switch</Text>
-              <Text style={styles.cardDescription}>
-                Dismiss current, show new
-              </Text>
+              <Text style={styles.cardDescription}>Dismiss current, show new</Text>
             </View>
             <ArrowRight size={20} color="#94A3B8" />
           </Pressable>
 
           <Pressable
-            style={({ pressed }) => [
-              styles.card,
-              pressed && styles.cardPressed,
-            ]}
+            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
             onPress={() => {
               SheetManager.show("replace-demo-1");
             }}
@@ -98,18 +88,13 @@ export default function HomeScreen() {
             </View>
             <View style={styles.cardContent}>
               <Text style={styles.cardTitle}>Replace</Text>
-              <Text style={styles.cardDescription}>
-                Crossfade content swap
-              </Text>
+              <Text style={styles.cardDescription}>Crossfade content swap</Text>
             </View>
             <ArrowRight size={20} color="#94A3B8" />
           </Pressable>
 
           <Pressable
-            style={({ pressed }) => [
-              styles.card,
-              pressed && styles.cardPressed,
-            ]}
+            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
             onPress={() => {
               SheetManager.show("push-demo-1");
             }}
@@ -119,9 +104,7 @@ export default function HomeScreen() {
             </View>
             <View style={styles.cardContent}>
               <Text style={styles.cardTitle}>Push</Text>
-              <Text style={styles.cardDescription}>
-                Stack sheets, pop to go back
-              </Text>
+              <Text style={styles.cardDescription}>Stack sheets, pop to go back</Text>
             </View>
             <ArrowRight size={20} color="#94A3B8" />
           </Pressable>
@@ -143,9 +126,7 @@ export default function HomeScreen() {
               <Music size={24} color="#10B981" />
             </View>
             <View style={styles.cardContent}>
-              <Text style={[styles.cardTitle, styles.cardTitleDark]}>
-                Music Player
-              </Text>
+              <Text style={[styles.cardTitle, styles.cardTitleDark]}>Music Player</Text>
               <Text style={[styles.cardDescription, styles.cardDescriptionDark]}>
                 Expand to see iOS-style scaling
               </Text>
@@ -170,9 +151,7 @@ export default function HomeScreen() {
               <Compass size={24} color="#6366F1" />
             </View>
             <View style={styles.cardContent}>
-              <Text style={[styles.cardTitle, styles.cardTitleDark]}>
-                Router Demo
-              </Text>
+              <Text style={[styles.cardTitle, styles.cardTitleDark]}>Router Demo</Text>
               <Text style={[styles.cardDescription, styles.cardDescriptionDark]}>
                 Bottom sheets as navigation screens
               </Text>
@@ -183,9 +162,7 @@ export default function HomeScreen() {
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>
-            @niibase/bottom-sheet-manager
-          </Text>
+          <Text style={styles.footerText}>@niibase/bottom-sheet-manager</Text>
         </View>
       </ScrollView>
     </SafeAreaView>

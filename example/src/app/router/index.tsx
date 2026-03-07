@@ -4,7 +4,6 @@ import {
   Layout,
   MessageSquare,
   Music,
-  RefreshCw,
   Settings,
   User,
 } from "lucide-react-native";

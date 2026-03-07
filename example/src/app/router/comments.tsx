@@ -1,3 +1,9 @@
+import Animated, {
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { Heart, MessageCircle, MoreHorizontal, Send, X } from "lucide-react-native";
 import { Keyboard, Pressable, StyleSheet, Text, View } from "react-native";
 import React, { useEffect } from "react";
@@ -74,16 +80,18 @@ const COMMENTS: Comment[] = [
 
 export default function CommentsSheet() {
   const navigation = useBottomSheetNavigation();
-  const [isExpanded, setIsExpanded] = React.useState(false);
+  const height = useSharedValue(68);
 
   useEffect(() => {
-    navigation.setOptions({
-      onAnimate: (_, to) => {
-        setIsExpanded(to >= 1);
-      },
-      snapPoints: ["65%", "90%"],
-      iosModalSheetTypeOfAnimation: true,
+    const sub = navigation.addListener("sheetOnAnimate", ({ data: { toIndex } }) => {
+      height.set(
+        withTiming(interpolate(toIndex, [0, 1], [68, 100], "clamp"), { duration: 150 }),
+      );
     });
+
+    return () => {
+      navigation.removeListener("sheetOnAnimate", sub);
+    };
   }, [navigation]);
 
   const [comments, setComments] = React.useState(COMMENTS);
@@ -156,8 +164,10 @@ export default function CommentsSheet() {
     </View>
   );
 
+  const animatedHeight = useAnimatedStyle(() => ({ height: `${height.value}%` }));
+
   return (
-    <View style={{ height: isExpanded ? "100%" : "71%" }}>
+    <Animated.View style={animatedHeight}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Comments</Text>
@@ -198,7 +208,7 @@ export default function CommentsSheet() {
           </Pressable>
         </View>
       </View>
-    </View>
+    </Animated.View>
   );
 }
 

@@ -61,7 +61,7 @@ export default function ExampleSheet({ id }: SheetProps<"example-sheet">) {
             ]}
             onPress={() => {
               setExpand(!expand);
-              sheetRef.current.snapToIndex(expand ? 0 : 1);
+              sheetRef.current?.snapToIndex(expand ? 0 : 1);
             }}
           >
             <Animated.View style={[styles.buttonContent, animatedStyle]}>
