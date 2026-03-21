@@ -114,13 +114,10 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
       stackBehavior = "switch",
       hardwareBackPressToClose = true,
       enableDynamicSizing = false,
-      handleIndicatorStyle,
       iosModalSheetTypeOfAnimation,
       snapPoints: defaultSnapPoints,
       animatedIndex: defaultAnimatedIndex,
-      backgroundStyle,
       onAnimate,
-      handleStyle,
       style,
       passThrough,
       opacity,
@@ -391,9 +388,6 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
           animatedIndex={animatedIndex}
           style={[defaultStyle, style]}
           snapPoints={enableDynamicSizing ? undefined : snapPoints}
-          handleIndicatorStyle={handleIndicatorStyle}
-          backgroundStyle={backgroundStyle}
-          handleStyle={handleStyle}
         >
           {children}
         </RNBottomSheet>
