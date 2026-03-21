@@ -2,12 +2,7 @@ import { ArrowRight, Layers, RefreshCw, X } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import React from "react";
 
-import {
-  BottomSheet,
-  SheetManager,
-  SheetProps,
-  useSheetRef,
-} from "@niibase/bottom-sheet-manager";
+import { BottomSheet, SheetManager, SheetProps } from "@niibase/bottom-sheet-manager";
 
 const THEME_COLOR = "#3B82F6"; // Blue
 
@@ -21,8 +16,6 @@ const DEPTH = 1;
 const SNAP_POINTS = ["90%"];
 
 export default function SwitchDemo1Sheet({ id }: SheetProps<"switch-demo-1">) {
-  const sheetRef = useSheetRef();
-
   const openNext = async () => {
     await SheetManager.show("switch-demo-2", {
       stackBehavior: "switch",
@@ -66,9 +59,9 @@ export default function SwitchDemo1Sheet({ id }: SheetProps<"switch-demo-1">) {
           <View style={styles.descriptionContainer}>
             <Text style={styles.title}>Switch Behavior</Text>
             <Text style={styles.description}>
-              Switch closes the current sheet before opening the new one. The
-              previous sheet won't return when this one closes. This is the
-              default behavior for modal transitions.
+              Switch closes the current sheet before opening the new one. The previous
+              sheet won't return when this one closes. This is the default behavior for
+              modal transitions.
             </Text>
           </View>
 
@@ -87,7 +80,7 @@ export default function SwitchDemo1Sheet({ id }: SheetProps<"switch-demo-1">) {
               styles.closeButton,
               pressed && styles.closeButtonPressed,
             ]}
-            onPress={() => sheetRef.current?.close()}
+            onPress={() => SheetManager.hide(id)}
           >
             <X size={18} color="#64748B" />
             <Text style={styles.closeButtonText}>Close</Text>

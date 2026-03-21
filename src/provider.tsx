@@ -5,6 +5,7 @@ import Animated, {
   SharedValue,
   useAnimatedReaction,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withSpring,
   withTiming,
@@ -84,7 +85,19 @@ export function SheetProvider({
   const sheetIds = Object.keys(sheetsRegistry[context] || sheetsRegistry["global"] || {});
 
   // IOS modal sheet type of animation
-  const isFullScreen = useSharedValue(-1);
+  const initialFullScreenValues: Record<string, number> = {};
+  const fullScreenValues = useSharedValue(initialFullScreenValues);
+
+  const isFullScreen = useDerivedValue(() => {
+    const values = Object.values(fullScreenValues.value);
+    let max = -1;
+
+    for (let i = 0; i < values.length; i++) {
+      if (values[i] > max) max = values[i];
+    }
+    return max;
+  });
+
   const colorStyle = useAnimatedStyle(() => ({
     flex: 1,
     backgroundColor: interpolateColor(
@@ -168,7 +181,9 @@ export function SheetProvider({
   }, [context, forceUpdate]);
 
   return (
-    <SheetSharedContext.Provider value={{ isFullScreen, topInset: top }}>
+    <SheetSharedContext.Provider
+      value={{ isFullScreen, fullScreenValues, topInset: top }}
+    >
       <Animated.View style={colorStyle}>
         <Animated.View style={animatedStyle}>{children}</Animated.View>
       </Animated.View>
@@ -185,9 +200,11 @@ const ProviderContext = React.createContext("global");
 const SheetIDContext = React.createContext<string | undefined>(undefined);
 const SheetSharedContext = React.createContext<{
   isFullScreen: SharedValue<number>;
+  fullScreenValues: SharedValue<Record<string, number>>;
   topInset: number;
 }>({
   isFullScreen: { value: 0 } as SharedValue<number>,
+  fullScreenValues: { value: {} } as SharedValue<Record<string, number>>,
   topInset: 0,
 });
 

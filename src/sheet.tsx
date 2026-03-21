@@ -142,7 +142,7 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
       [bottom, left, right],
     );
 
-    const { isFullScreen } = useSheetSharedContext();
+    const { fullScreenValues } = useSheetSharedContext();
     const [snapPoints, fullScreenIndex] = React.useMemo(() => {
       let resolved = defaultSnapPoints;
 
@@ -167,6 +167,9 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
     const hardwareBackPressEvent = React.useRef<NativeEventSubscription>(
       null,
     ) as React.MutableRefObject<NativeEventSubscription>;
+    const teardownDataRef = React.useRef<{ dismiss?: boolean; behavior?: StackBehavior }>(
+      {},
+    );
 
     const id = useSheetIDContext();
     const sheetId = props.id || id;
@@ -213,17 +216,76 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
           defaultAnimatedIndex.set(index);
         }
 
-        if (iosModalSheetTypeOfAnimation) {
-          isFullScreen.set(
-            interpolate(
-              index,
-              [fullScreenIndex - 1, fullScreenIndex, fullScreenIndex + 1],
-              [0, 1, 0],
-            ),
+        if (iosModalSheetTypeOfAnimation && sheetId) {
+          const val = interpolate(
+            index,
+            [fullScreenIndex - 0.5, fullScreenIndex, fullScreenIndex + 1],
+            [0, 1, 0],
+            "clamp",
           );
+          const current = { ...fullScreenValues.value };
+          current[sheetId] = val;
+          fullScreenValues.value = current;
         }
       },
-      [iosModalSheetTypeOfAnimation],
+      [iosModalSheetTypeOfAnimation, sheetId],
+    );
+
+    React.useEffect(() => {
+      return () => {
+        if (iosModalSheetTypeOfAnimation && sheetId) {
+          const current = { ...fullScreenValues.value };
+          delete current[sheetId];
+          fullScreenValues.value = current;
+        }
+      };
+    }, [iosModalSheetTypeOfAnimation, sheetId, fullScreenValues]);
+
+    const teardownSheet = React.useCallback(
+      (value: unknown, dismiss: boolean | undefined, behavior: StackBehavior) => {
+        if (!sheetId) return;
+
+        const hasHistory = PrivateManager.history.length > 0;
+        const shouldRestorePrevious = behavior !== "replace";
+
+        eventManager.publish(
+          `onclose_${sheetId}`,
+          value,
+          currentCtx,
+          hasHistory || !!dismiss,
+          behavior,
+        );
+
+        if (shouldRestorePrevious) {
+          if (dismiss) {
+            // it will surface naturally when the push sheet is closed.
+            if (behavior !== "push") {
+              PrivateManager.history.push({
+                id: sheetId,
+                context: currentCtx,
+                behavior: behavior,
+              });
+            }
+          } else if (hasHistory) {
+            const otherSheetsStillOpen = PrivateManager.stack().some(
+              (s) => !(s.id === sheetId && s.context === currentCtx),
+            );
+            if (!otherSheetsStillOpen) {
+              const prev = PrivateManager.history.pop()!;
+              eventManager.publish(
+                `show_wrap_${prev.id}`,
+                undefined,
+                prev.context,
+                true,
+                prev.behavior,
+              );
+            }
+          }
+        }
+
+        PrivateManager.remove(sheetId, currentCtx);
+      },
+      [sheetId, currentCtx],
     );
 
     const hideSheet = React.useCallback(
@@ -242,9 +304,6 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
 
         hardwareBackPressEvent.current?.remove();
 
-        const closeValue = onClose?.(value as never);
-        if (closeValue !== undefined) value = closeValue;
-
         if (dismiss && activeBehavior === "push") {
           // For push behavior, a "dismiss" event means another sheet wants to
           // appear on top — do not close this sheet.
@@ -252,55 +311,34 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
           return;
         }
 
-        if (activeBehavior !== "replace" || !dismiss) {
+        const shouldClose = activeBehavior !== "replace" || !dismiss;
+
+        if (fromManager && shouldClose) {
+          valueRef.current = value;
+          teardownDataRef.current = { dismiss, behavior: activeBehavior };
+          bottomSheetRef.current?.close();
+          return;
+        }
+
+        const finalDismiss = fromManager ? dismiss : teardownDataRef.current.dismiss;
+        const finalBehavior = fromManager
+          ? activeBehavior
+          : (teardownDataRef.current.behavior ?? activeBehavior);
+
+        teardownDataRef.current = {};
+
+        const closeValue = onClose?.(value as never);
+        if (closeValue !== undefined) value = closeValue;
+
+        if (shouldClose) {
           bottomSheetRef.current?.close();
         }
 
-        if (sheetId) {
-          const hasHistory = PrivateManager.history.length > 0;
-          const shouldRestorePrevious = activeBehavior !== "replace";
-
-          eventManager.publish(
-            `onclose_${sheetId}`,
-            value,
-            currentCtx,
-            hasHistory || !!dismiss,
-            activeBehavior,
-          );
-
-          if (shouldRestorePrevious) {
-            if (dismiss) {
-              // it will surface naturally when the push sheet is closed.
-              if (activeBehavior !== "push") {
-                PrivateManager.history.push({
-                  id: sheetId,
-                  context: currentCtx,
-                  behavior: activeBehavior,
-                });
-              }
-            } else if (hasHistory) {
-              const otherSheetsStillOpen = PrivateManager.stack().some(
-                (s) => !(s.id === sheetId && s.context === currentCtx),
-              );
-              if (!otherSheetsStillOpen) {
-                const prev = PrivateManager.history.pop()!;
-                eventManager.publish(
-                  `show_wrap_${prev.id}`,
-                  undefined,
-                  prev.context,
-                  true,
-                  prev.behavior,
-                );
-              }
-            }
-          }
-
-          PrivateManager.remove(sheetId, currentCtx);
-        }
+        teardownSheet(value, finalDismiss, finalBehavior);
 
         if (fromManager) valueRef.current = data;
       },
-      [sheetId, currentCtx, onClose, currentStackBehavior],
+      [currentStackBehavior, onClose, teardownSheet],
     );
 
     React.useEffect(() => {

@@ -2,12 +2,7 @@ import { ArrowRight, Layers, RefreshCw, X } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import React from "react";
 
-import {
-  BottomSheet,
-  SheetManager,
-  SheetProps,
-  useSheetRef,
-} from "@niibase/bottom-sheet-manager";
+import { BottomSheet, SheetManager, SheetProps } from "@niibase/bottom-sheet-manager";
 
 const THEME_COLOR = "#10B981"; // Green
 
@@ -21,8 +16,6 @@ const DEPTH = 1;
 const SNAP_POINTS = ["90%"];
 
 export default function ReplaceDemo1Sheet({ id }: SheetProps<"replace-demo-1">) {
-  const sheetRef = useSheetRef();
-
   const openNext = async () => {
     await SheetManager.show("replace-demo-2", {
       stackBehavior: "replace",
@@ -66,9 +59,9 @@ export default function ReplaceDemo1Sheet({ id }: SheetProps<"replace-demo-1">) 
           <View style={styles.descriptionContainer}>
             <Text style={styles.title}>Replace Behavior</Text>
             <Text style={styles.description}>
-              Replace swaps the content with a smooth crossfade animation. The
-              sheet container stays mounted - only the content inside changes.
-              Perfect for wizard flows and multi-step forms.
+              Replace swaps the content with a smooth crossfade animation. The sheet
+              container stays mounted - only the content inside changes. Perfect for
+              wizard flows and multi-step forms.
             </Text>
           </View>
 
@@ -87,7 +80,7 @@ export default function ReplaceDemo1Sheet({ id }: SheetProps<"replace-demo-1">) 
               styles.closeButton,
               pressed && styles.closeButtonPressed,
             ]}
-            onPress={() => sheetRef.current?.close()}
+            onPress={() => SheetManager.hide(id)}
           >
             <X size={18} color="#64748B" />
             <Text style={styles.closeButtonText}>Close</Text>
