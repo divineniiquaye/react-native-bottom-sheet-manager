@@ -14,7 +14,6 @@
     "build": "bob build && yarn copy-dts && yarn delete-dts.js",
     "copy-dts": "copyfiles -u 1 \"src/**/*.d.ts\" lib/typescript",
     "delete-dts.js": "find ./lib/commonjs -name '*.d.js*' -delete && find ./lib/module -name '*.d.js*' -delete",
-    "postinstall": "node scripts/postinstall.mjs",
     "bootstrap": "yarn install && yarn example",
     "example": "yarn --cwd example",
     "patch": "patch-package"
@@ -69,7 +68,7 @@
     }
   },
   "dependencies": {
-    "@gorhom/bottom-sheet": "^5.2.8",
+    "@gorhom/bottom-sheet": "^5.2.9",
     "nanoid": "^5.1.6"
   },
   "devDependencies": {
