@@ -68,7 +68,7 @@
     }
   },
   "dependencies": {
-    "@gorhom/bottom-sheet": "^5.2.9",
+    "@gorhom/bottom-sheet": "^5.2.13",
     "nanoid": "^5.1.6"
   },
   "devDependencies": {
