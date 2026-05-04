@@ -178,4 +178,10 @@ export type BottomSheetProps<Id extends SheetIds = SheetIds> = Omit<
      * @default false
      */
     iosModalSheetTypeOfAnimation?: boolean;
+
+    /**
+     * Reanimated timing/spring config for dismiss animations initiated by this wrapper
+     * (`SheetManager.hide`, ref `close()`, hardware back). Overrides the default snappy close.
+     */
+    closeAnimationConfigs?: AnimationConfigs;
 };

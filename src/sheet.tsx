@@ -11,6 +11,7 @@ import RNBottomSheet, {
   BottomSheetView,
   BottomSheetVirtualizedList,
 } from "@gorhom/bottom-sheet";
+import React from "react";
 import {
   BackHandler,
   Platform,
@@ -19,13 +20,17 @@ import {
   type NativeEventSubscription,
 } from "react-native";
 import {
+  Easing,
   interpolate,
+  type WithSpringConfig,
+  type WithTimingConfig,
   useAnimatedReaction,
   useSharedValue,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import React from "react";
 
+import { eventManager } from "./events";
+import { PrivateManager } from "./manager";
 import {
   useProviderContext,
   useSheetIDContext,
@@ -34,8 +39,6 @@ import {
   useStackBehaviorContext,
 } from "./provider";
 import { BottomSheetInstance, BottomSheetProps, SheetIds, StackBehavior } from "./types";
-import { PrivateManager } from "./manager";
-import { eventManager } from "./events";
 
 interface BottomSheetFC
   extends React.MemoExoticComponent<React.ForwardRefExoticComponent<BottomSheetProps>> {
@@ -58,6 +61,11 @@ interface BottomSheetFC
 
 const FULL_SCREEN_POINTS: (string | number)[] =
   Platform.OS === "ios" ? ["%90", "90%"] : ["%93", "93%"];
+
+const DEFAULT_SHEET_CLOSE_ANIMATION: WithTimingConfig = {
+  duration: 300,
+  easing: Easing.out(Easing.cubic),
+};
 
 const useSheetManager = ({
   id,
@@ -121,6 +129,7 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
       style,
       passThrough,
       opacity,
+      closeAnimationConfigs,
       ...props
     },
     ref,
@@ -135,11 +144,12 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
       React.useState<StackBehavior>(stackBehavior);
     const isPushed = currentStackBehavior === "push";
 
-    const { bottom, left, right } = useSafeAreaInsets();
+    const { bottom } = useSafeAreaInsets();
+    const defaultStyle = React.useMemo(() => ({ paddingBottom: bottom }), [bottom]);
 
-    const defaultStyle = React.useMemo(
-      () => ({ paddingBottom: bottom, paddingLeft: left, paddingRight: right }),
-      [bottom, left, right],
+    const effectiveCloseAnimation = React.useMemo(
+      () => closeAnimationConfigs ?? DEFAULT_SHEET_CLOSE_ANIMATION,
+      [closeAnimationConfigs],
     );
 
     const { fullScreenValues } = useSheetSharedContext();
@@ -225,7 +235,7 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
           );
           const current = { ...fullScreenValues.value };
           current[sheetId] = val;
-          fullScreenValues.value = current;
+          fullScreenValues.set(current);
         }
       },
       [iosModalSheetTypeOfAnimation, sheetId],
@@ -236,7 +246,7 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
         if (iosModalSheetTypeOfAnimation && sheetId) {
           const current = { ...fullScreenValues.value };
           delete current[sheetId];
-          fullScreenValues.value = current;
+          fullScreenValues.set(current);
         }
       };
     }, [iosModalSheetTypeOfAnimation, sheetId, fullScreenValues]);
@@ -316,7 +326,7 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
         if (fromManager && shouldClose) {
           valueRef.current = value;
           teardownDataRef.current = { dismiss, behavior: activeBehavior };
-          bottomSheetRef.current?.close();
+          bottomSheetRef.current?.close(effectiveCloseAnimation);
           return;
         }
 
@@ -331,14 +341,14 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
         if (closeValue !== undefined) value = closeValue;
 
         if (shouldClose) {
-          bottomSheetRef.current?.close();
+          bottomSheetRef.current?.close(effectiveCloseAnimation);
         }
 
         teardownSheet(value, finalDismiss, finalBehavior);
 
         if (fromManager) valueRef.current = data;
       },
-      [currentStackBehavior, onClose, teardownSheet],
+      [currentStackBehavior, effectiveCloseAnimation, onClose, teardownSheet],
     );
 
     React.useEffect(() => {
@@ -349,7 +359,12 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
       (): BottomSheetInstance => ({
         close(options = {}): void {
           valueRef.current = (options as Record<string, unknown>).value;
-          bottomSheetRef.current?.close(options?.animationConfigs);
+          const opts = options as {
+            animationConfigs?: WithSpringConfig | WithTimingConfig;
+          };
+          bottomSheetRef.current?.close(
+            opts.animationConfigs ?? effectiveCloseAnimation,
+          );
         },
         expand(animationConfigs): void {
           bottomSheetRef.current?.expand(animationConfigs);
@@ -364,7 +379,7 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
           bottomSheetRef.current?.snapToPosition(position, animationConfigs);
         },
       }),
-      [],
+      [effectiveCloseAnimation],
     );
 
     React.useEffect(() => {
