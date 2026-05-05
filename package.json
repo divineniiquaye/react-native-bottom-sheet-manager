@@ -15,8 +15,7 @@
     "copy-dts": "copyfiles -u 1 \"src/**/*.d.ts\" lib/typescript",
     "delete-dts.js": "find ./lib/commonjs -name '*.d.js*' -delete && find ./lib/module -name '*.d.js*' -delete",
     "bootstrap": "yarn install && yarn example",
-    "example": "yarn --cwd example",
-    "patch": "patch-package"
+    "example": "yarn --cwd example"
   },
   "repository": {
     "type": "git",
