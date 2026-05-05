@@ -416,6 +416,23 @@ function MySheet({ id }: SheetProps<"my-sheet">) {
 }
 ```
 
+```tsx
+function MySheet({ id }: SheetProps<"my-sheet">) {
+    return (
+        <TrueSheet
+            id={id}
+            detents={[0.5, 1]}
+            className="bg-white"
+            scrollable
+        >
+            <ScrollView className="gap-4 px-4 py-6">
+                <Text className="text-lg font-bold">Hello TrueSheet</Text>
+            </ScrollView>
+        </BottomSheet>
+    );
+}
+```
+
 ### TrueSheet-Specific Styling Props
 
 | Prop              | Type                                                                | Description                                                       |
@@ -460,6 +477,8 @@ Or in navigation options:
 ```
 
 > **Note:** When `iosModalSheetTypeOfAnimation` is `false` (the default), no animated wrappers are added to the component tree, keeping your app's layout overhead minimal.
+>
+> **TrueSheet Android behavior:** When `iosModalSheetTypeOfAnimation` is `true`, Android normalizes full-screen detents so `1` maps to `0.9` (and `0.9` stays `0.9`) to keep modal-style animation behavior consistent.
 
 ## Advanced Features
 
@@ -562,7 +581,7 @@ Global manager for showing and hiding sheets.
 | ------------------------------ | --------------------------------- | ---------- | ------------------------------------------------------------------------------------- |
 | `id`                           | `SheetID<SheetIds>`               | -          | Unique identifier for the sheet                                                       |
 | `stackBehavior`                | `"push" \| "replace" \| "switch"` | `"switch"` | How sheets stack when opened                                                          |
-| `iosModalSheetTypeOfAnimation` | `boolean`                         | `false`    | Enable iOS 18 modal animation                                                         |
+| `iosModalSheetTypeOfAnimation` | `boolean`                         | `false`    | Enable iOS 18 modal animation (for TrueSheet on Android, detent `1` is normalized to `0.9`) |
 | `passThrough`                  | `boolean`                         | `false`    | Allow tapping through backdrop                                                        |
 | `opacity`                      | `number`                          | `0.45`     | Backdrop opacity                                                                      |
 | `hardwareBackPressToClose`     | `boolean`                         | `true`     | Close on hardware back button (Android)                                               |
@@ -598,7 +617,7 @@ Sub-components available on `BottomSheet`:
 
 | Prop                    | Type                            | Default       | Description                                                      |
 | ----------------------- | ------------------------------- | ------------- | ---------------------------------------------------------------- |
-| `detents`               | `SheetDetent[]`                 | `[0.5, 1]`    | Detent heights (`'auto'`, or `0`–`1` fraction). Max 3            |
+| `detents`               | `SheetDetent[]`                 | `[0.5, 1]`    | Detent heights (`'auto'`, or `0`–`1` fraction). Max 3. With `iosModalSheetTypeOfAnimation` on Android, `1` is treated as `0.9` |
 | `cornerRadius`          | `number`                        | -             | Sheet corner radius (`0` for sharp)                              |
 | `grabber`               | `boolean`                       | `true`        | Show native drag handle                                          |
 | `grabberOptions`        | `GrabberOptions`                | -             | Customize grabber appearance                                     |
