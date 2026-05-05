@@ -1,6 +1,6 @@
 # Bottom Sheet Router & Manager
 
-A powerful bottom sheet manager and router for React Native, inspired by [react-native-actions-sheet](https://github.com/ammarahm-ed/@repo/bottom-sheet) and built on top of [@gorhom/bottom-sheet](https://github.com/gorhom/react-native-bottom-sheet).
+A powerful bottom sheet manager and router for React Native, inspired by [react-native-actions-sheet](https://github.com/ammarahm-ed/@repo/bottom-sheet) and built on top of [@gorhom/bottom-sheet](https://github.com/gorhom/react-native-bottom-sheet) with optional support for [@lodev09/react-native-true-sheet](https://github.com/lodev09/react-native-true-sheet).
 
 ## Features
 
@@ -11,6 +11,7 @@ A powerful bottom sheet manager and router for React Native, inspired by [react-
 - 🎨 **TypeScript Support** - Full type safety with IntelliSense
 - ⚡ **Performance Optimized** - High-performance event system with O(1) lookups
 - 🔌 **Flexible Hooks** - Rich set of hooks for advanced use cases
+- 🪟 **Dual Vendor Support** - Use `@gorhom/bottom-sheet` (JS-driven) or `@lodev09/react-native-true-sheet` (native-driven)
 
 ## Installation
 
@@ -18,9 +19,20 @@ A powerful bottom sheet manager and router for React Native, inspired by [react-
 npm install @niibase/bottom-sheet-manager
 ```
 
+## Vendors
+
+This library supports two bottom sheet implementations. Choose the one that fits your needs:
+
+| Vendor                               | Import                   | Sheet Component                                                        | Platform          | Best For                                                                   |
+| ------------------------------------ | ------------------------ | ---------------------------------------------------------------------- | ----------------- | -------------------------------------------------------------------------- |
+| **@gorhom/bottom-sheet** (default)   | `import { BottomSheet }` | JS-driven, highly customizable                                         | iOS + Android     | Full control over animations, custom handles, backdrop, and sub-components |
+| **@lodev09/react-native-true-sheet** | `import { TrueSheet }`   | Native-driven (UISheetPresentationController / Material 3 BottomSheet) | iOS 16+ + Android | True native look & feel, smaller bundle, less JS overhead                  |
+
+Both vendors share the same manager API (`SheetManager.show`, `SheetManager.hide`, `registerSheet`, `useSheetRef`, etc.) — the only difference is the sheet component and its props.
+
 ## Quick Start
 
-### Basic Usage
+### Using @gorhom/bottom-sheet (default)
 
 `SheetManager` helps you save development time by allowing you to reuse modal sheets throughout your app without boilerplate.
 
@@ -44,6 +56,31 @@ function ExampleSheet({ id }: SheetProps<"example-sheet">) {
 
 export default ExampleSheet;
 ```
+
+### Using @lodev09/react-native-true-sheet
+
+Import `TrueSheet` instead of `BottomSheet`. The component API uses native-oriented props:
+
+```tsx
+import { SheetManager, TrueSheet } from "@niibase/bottom-sheet-manager";
+import type { SheetProps } from "@niibase/bottom-sheet-manager";
+```
+
+```tsx
+function ExampleSheet({ id }: SheetProps<"example-sheet">) {
+    return (
+        <TrueSheet id={id} detents={[0.5, 1]} cornerRadius={24} grabber scrollable>
+            <ScrollView style={{ padding: 16 }}>
+                <Text>Hello from TrueSheet</Text>
+            </ScrollView>
+        </TrueSheet>
+    );
+}
+
+export default ExampleSheet;
+```
+
+### Registration (same for both vendors)
 
 Register your sheet **at module level** in a `sheets.ts` file (never inside JSX):
 
@@ -108,14 +145,23 @@ Control how sheets behave when opened on top of existing sheets:
 - **`push`**: Pushes new sheet on top, creating a navigable stack. Previous sheet remains visible underneath.
 
 ```tsx
-// Set stack behavior per sheet
+// Using BottomSheet (gorhom)
 <BottomSheet
     id={id}
-    stackBehavior="push" // or "switch" or "replace"
+    stackBehavior="push"
     snapPoints={["50%", "90%"]}
 >
     {/* content */}
 </BottomSheet>
+
+// Using TrueSheet
+<TrueSheet
+    id={id}
+    stackBehavior="push"
+    detents={[0.5, 0.9]}
+>
+    {/* content */}
+</TrueSheet>
 ```
 
 ## React Navigation Integration
@@ -126,7 +172,6 @@ Full support for React Navigation v6/v7 and Expo Router. The first screen in the
 
 ```tsx
 import { Slot, withLayoutContext } from "expo-router";
-
 import {
     BottomSheetNavigationEventMap,
     BottomSheetNavigationOptions,
@@ -290,6 +335,103 @@ function MyComponent() {
 }
 ```
 
+## Styling with NativeWind / Uniwind
+
+Both `BottomSheet` and `TrueSheet` are third-party components — `className` does **not** work on them out of the box. You must wrap or register them so the styling framework knows how to convert class names to native styles.
+
+### Uniwind — wrapping with `withUniwind`
+
+**Uniwind** provides a `withUniwind` HOC that converts `className` → `style` and color props → `*ColorClassName`. Wrap **outside your component** (at module level) so the HOC only runs once:
+
+```tsx
+import { BottomSheet } from "@niibase/bottom-sheet-manager";
+import { withUniwind } from "uniwind";
+
+// ✅ Wrap at module level — not inside JSX
+const StyledBottomSheet = withUniwind(BottomSheet);
+
+function MySheet({ id }: SheetProps<"my-sheet">) {
+    return (
+        <StyledBottomSheet
+            id={id}
+            snapPoints={["50%", "90%"]}
+            className="bg-white rounded-t-3xl"
+            handleIndicatorClassName="bg-gray-300 w-10"
+        >
+            {/* content */}
+        </StyledBottomSheet>
+    );
+}
+```
+
+For **TrueSheet**:
+
+```tsx
+import { TrueSheet } from "@niibase/bottom-sheet-manager";
+import { withUniwind } from "uniwind";
+
+const StyledTrueSheet = withUniwind(TrueSheet);
+
+function MySheet({ id }: SheetProps<"my-sheet">) {
+    return (
+        <StyledTrueSheet
+            id={id}
+            detents={[0.5, 1]}
+            cornerRadius={24}
+            grabber
+            className="bg-white"
+        >
+            <ScrollView className="gap-4 px-4 py-6">
+                <Text className="text-lg font-bold">Hello TrueSheet</Text>
+            </ScrollView>
+        </StyledTrueSheet>
+    );
+}
+```
+
+**NativeWind** uses `cssInterop` to tell the Babel plugin how to convert `className` on a given component. Call it **once at your app entry point** (e.g. your `_layout.tsx`):
+
+```tsx
+import { BottomSheet, TrueSheet } from "@niibase/bottom-sheet-manager";
+import { cssInterop } from "nativewind";
+
+// Register once at app entry
+cssInterop(BottomSheet, { className: "style" });
+cssInterop(TrueSheet, { className: "style" });
+```
+
+Now `className` works directly on the registered components:
+
+```tsx
+function MySheet({ id }: SheetProps<"my-sheet">) {
+    return (
+        <BottomSheet
+            id={id}
+            snapPoints={["50%", "90%"]}
+            className="bg-white rounded-t-3xl"
+        >
+            <Text className="text-lg font-bold">Hello World</Text>
+        </BottomSheet>
+    );
+}
+```
+
+### TrueSheet-Specific Styling Props
+
+| Prop              | Type                                                                | Description                                                       |
+| ----------------- | ------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `cornerRadius`    | `number`                                                            | Border radius of the sheet (use `0` for sharp corners)            |
+| `backgroundColor` | `ColorValue`                                                        | Sheet background color (use to override liquid glass on iOS 26+)  |
+| `grabber`         | `boolean`                                                           | Show a native drag handle (default `true`)                        |
+| `grabberOptions`  | `{ width?, height?, topMargin?, cornerRadius?, color?, adaptive? }` | Customize the grabber appearance                                  |
+| `dimmed`          | `boolean`                                                           | Dim the background (default `true`)                               |
+| `dismissible`     | `boolean`                                                           | Allow interactive dismissal (default `true`)                      |
+| `draggable`       | `boolean`                                                           | Allow dragging to resize (default `true`)                         |
+| `backgroundBlur`  | `BackgroundBlur`                                                    | iOS blur style behind the sheet (e.g. `"system-material"`)        |
+| `blurOptions`     | `{ intensity?, interaction? }`                                      | Fine-tune the blur effect (iOS only)                              |
+| `elevation`       | `number`                                                            | Sheet shadow elevation (Android/Web, default `4`)                 |
+| `insetAdjustment` | `"automatic" \| "never"`                                            | Safe area inset behavior for sheet height (default `"automatic"`) |
+
 ## iOS 18 Modal Animation
 
 Enable native-like iOS 18 modal sheet animations:
@@ -414,20 +556,74 @@ Global manager for showing and hiding sheets.
 | `pop`       | `pop() → void`                                         | Close top-most pushed sheet                   |
 | `reset`     | `reset() → void`                                       | Reset all internal state (useful for testing) |
 
-### `BottomSheet` Props
-
-All props from `@gorhom/bottom-sheet` are supported, plus:
+### Shared Props (applicable to both `BottomSheet` and `TrueSheet`)
 
 | Prop                           | Type                              | Default    | Description                                                                           |
 | ------------------------------ | --------------------------------- | ---------- | ------------------------------------------------------------------------------------- |
 | `id`                           | `SheetID<SheetIds>`               | -          | Unique identifier for the sheet                                                       |
 | `stackBehavior`                | `"push" \| "replace" \| "switch"` | `"switch"` | How sheets stack when opened                                                          |
 | `iosModalSheetTypeOfAnimation` | `boolean`                         | `false`    | Enable iOS 18 modal animation                                                         |
-| `clickThrough`                 | `boolean`                         | `false`    | Allow tapping through backdrop                                                        |
+| `passThrough`                  | `boolean`                         | `false`    | Allow tapping through backdrop                                                        |
 | `opacity`                      | `number`                          | `0.45`     | Backdrop opacity                                                                      |
 | `hardwareBackPressToClose`     | `boolean`                         | `true`     | Close on hardware back button (Android)                                               |
 | `onClose`                      | `(data?) => ReturnValue \| void`  | -          | Callback when sheet closes; return a value to override what's sent back to the caller |
 | `onBeforeShow`                 | `(data?) => void`                 | -          | Callback before sheet shows                                                           |
+
+### `BottomSheet` Props (gorhom-specific)
+
+All props from `@gorhom/bottom-sheet` are supported, including:
+
+| Prop                   | Type                      | Description                                |
+| ---------------------- | ------------------------- | ------------------------------------------ |
+| `snapPoints`           | `Array<string \| number>` | Snap points (e.g. `["25%", "50%", "90%"]`) |
+| `enableDynamicSizing`  | `boolean`                 | Size sheet to fit content                  |
+| `enablePanDownToClose` | `boolean`                 | Swipe down to dismiss                      |
+| `handleComponent`      | `React.FC`                | Custom handle component                    |
+| `footerComponent`      | `React.FC`                | Custom footer component                    |
+| `backgroundStyle`      | `ViewStyle`               | Background container style                 |
+| `handleIndicatorStyle` | `ViewStyle`               | Handle indicator style                     |
+
+Sub-components available on `BottomSheet`:
+
+- `BottomSheet.View` — Wrapper view with proper insets
+- `BottomSheet.ScrollView` — ScrollView optimized for bottom sheets
+- `BottomSheet.FlatList` — FlatList optimized for bottom sheets
+- `BottomSheet.SectionList` — SectionList optimized for bottom sheets
+- `BottomSheet.TextInput` — TextInput that works with keyboard handling
+- `BottomSheet.Handle` — Custom drag handle
+- `BottomSheet.Footer` — Footer component
+- `BottomSheet.Backdrop` — Custom backdrop component
+
+### `TrueSheet` Props (native-specific)
+
+| Prop                    | Type                            | Default       | Description                                                      |
+| ----------------------- | ------------------------------- | ------------- | ---------------------------------------------------------------- |
+| `detents`               | `SheetDetent[]`                 | `[0.5, 1]`    | Detent heights (`'auto'`, or `0`–`1` fraction). Max 3            |
+| `cornerRadius`          | `number`                        | -             | Sheet corner radius (`0` for sharp)                              |
+| `grabber`               | `boolean`                       | `true`        | Show native drag handle                                          |
+| `grabberOptions`        | `GrabberOptions`                | -             | Customize grabber appearance                                     |
+| `scrollable`            | `boolean`                       | `false`       | Enable native scroll handling (auto-detects ScrollView/FlatList) |
+| `scrollableOptions`     | `ScrollableOptions`             | -             | Keyboard offset, scroll expansion behavior                       |
+| `dimmed`                | `boolean`                       | `true`        | Dim the background                                               |
+| `dimmedDetentIndex`     | `number`                        | `0`           | Detent at which dimming starts                                   |
+| `dismissible`           | `boolean`                       | `true`        | Allow interactive dismissal                                      |
+| `draggable`             | `boolean`                       | `true`        | Allow dragging to resize                                         |
+| `header`                | `ComponentType \| ReactElement` | -             | Fixed header pinned to top                                       |
+| `footer`                | `ComponentType \| ReactElement` | -             | Floating footer pinned to bottom                                 |
+| `headerStyle`           | `ViewStyle`                     | -             | Header container style                                           |
+| `footerStyle`           | `ViewStyle`                     | -             | Footer container style                                           |
+| `backgroundColor`       | `ColorValue`                    | -             | Sheet background color                                           |
+| `backgroundBlur`        | `BackgroundBlur`                | -             | iOS blur style                                                   |
+| `blurOptions`           | `BlurOptions`                   | -             | Blur intensity/interaction options                               |
+| `elevation`             | `number`                        | `4`           | Android/Web shadow depth                                         |
+| `maxContentHeight`      | `number`                        | -             | Max content height override                                      |
+| `maxContentWidth`       | `number`                        | -             | Max content width override                                       |
+| `anchor`                | `"left" \| "center" \| "right"` | `"center"`    | Horizontal anchor (tablet/landscape)                             |
+| `anchorOffset`          | `number`                        | `16`          | Offset from edge when anchored                                   |
+| `pageSizing`            | `boolean`                       | `true`        | iPad page sheet style (iOS 17+)                                  |
+| `insetAdjustment`       | `"automatic" \| "never"`        | `"automatic"` | Safe area inset behavior                                         |
+| `initialDetentIndex`    | `number`                        | `-1`          | Auto-present at this detent on mount                             |
+| `initialDetentAnimated` | `boolean`                       | `true`        | Animate initial presentation                                     |
 
 ### `SheetProvider` Props
 
@@ -444,7 +640,7 @@ Screen options for navigation-based sheets:
 | Option                         | Type                      | Default   | Description                    |
 | ------------------------------ | ------------------------- | --------- | ------------------------------ |
 | `snapPoints`                   | `Array<string \| number>` | `['66%']` | Snap points for the sheet      |
-| `clickThrough`                 | `boolean`                 | `false`   | Allow tapping through backdrop |
+| `passThrough`                  | `boolean`                 | `false`   | Allow tapping through backdrop |
 | `iosModalSheetTypeOfAnimation` | `boolean`                 | `false`   | Enable iOS 18 modal animation  |
 | `opacity`                      | `number`                  | `0.45`    | Backdrop opacity               |
 
@@ -467,10 +663,11 @@ navigation.dispatch(BottomSheetActions.remove());
 
 The source code for the example (showcase) app is under the [/example](/example/) directory. It includes:
 
-- Basic sheet usage
-- Stack behavior demos (push, replace, switch) including mixed stacks
+- Basic sheet usage (gorhom and TrueSheet)
+- Stack behavior demos (push, replace, switch) for both vendors
 - React Navigation integration
 - iOS modal animation examples
+- TrueSheet-specific demos (header/footer, grabber, scrollable, stacking)
 - Navigation actions and hooks usage
 
 ## Contributing
@@ -485,7 +682,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 <div align="center">
 
-**Built with ❤️ by [@divineniiquaye](https://github.com/divineniiquaye) using React Native and [@gorhom/bottom-sheet](https://github.com/gorhom/react-native-bottom-sheet).**
+**Built with ❤️ by [@divineniiquaye](https://github.com/divineniiquaye) using React Native with [@gorhom/bottom-sheet](https://github.com/gorhom/react-native-bottom-sheet) and [@lodev09/react-native-true-sheet](https://github.com/lodev09/react-native-true-sheet).**
 
 [⬆ Back to Top](#bottom-sheet-router--manager)
 
