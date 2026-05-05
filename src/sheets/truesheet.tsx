@@ -1,16 +1,8 @@
-import RNBottomSheet, {
-  BottomSheetBackdrop,
-  BottomSheetFlatList,
-  BottomSheetFooter,
-  BottomSheetFooterContainer,
-  BottomSheetHandle,
-  BottomSheetModal,
-  BottomSheetScrollView,
-  BottomSheetSectionList,
-  BottomSheetTextInput,
-  BottomSheetView,
-  BottomSheetVirtualizedList,
-} from "@gorhom/bottom-sheet";
+import { TrueSheet } from "@lodev09/react-native-true-sheet";
+import type {
+  TrueSheetProps as NativeTrueSheetProps,
+  PositionChangeEvent,
+} from "@lodev09/react-native-true-sheet";
 import React from "react";
 import {
   BackHandler,
@@ -18,54 +10,55 @@ import {
   StyleSheet,
   View,
   type NativeEventSubscription,
+  type StyleProp,
+  type ViewStyle,
 } from "react-native";
-import {
-  Easing,
-  interpolate,
-  type WithSpringConfig,
-  type WithTimingConfig,
-  useAnimatedReaction,
-  useSharedValue,
-} from "react-native-reanimated";
+import { interpolate } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { eventManager } from "./events";
-import { PrivateManager } from "./manager";
+import { eventManager } from "../events";
+import { PrivateManager } from "../manager";
 import {
   useProviderContext,
   useSheetIDContext,
   useSheetRef,
   useSheetSharedContext,
-  useStackBehaviorContext,
-} from "./provider";
-import { BottomSheetInstance, BottomSheetProps, SheetIds, StackBehavior } from "./types";
+} from "../provider";
+import { BottomSheetInstance, BottomSheetProps, SheetIds, StackBehavior } from "../types";
 
-interface BottomSheetFC
-  extends React.MemoExoticComponent<React.ForwardRefExoticComponent<BottomSheetProps>> {
-  <Id extends SheetIds>(
-    props: BottomSheetProps<Id> & React.RefAttributes<BottomSheetInstance<Id>>,
-  ): React.JSX.Element;
+type OmittedTrueSheetProps =
+  | "name"
+  | "onDidDismiss"
+  | "onBackPress"
+  | "onPositionChange"
+  | "onMount"
+  | "children"
+  | "style";
 
-  // Components
-  View: typeof BottomSheetView;
-  ScrollView: typeof BottomSheetScrollView;
-  FlatList: typeof BottomSheetFlatList;
-  SectionList: typeof BottomSheetSectionList;
-  VirtualizedList: typeof BottomSheetVirtualizedList;
-  Handle: typeof BottomSheetHandle;
-  Footer: typeof BottomSheetFooter;
-  FooterContainer: typeof BottomSheetFooterContainer;
-  Backdrop: typeof BottomSheetBackdrop;
-  TextInput: typeof BottomSheetTextInput;
+interface TrueSheetComponentProps<Id extends SheetIds = SheetIds>
+  extends Omit<NativeTrueSheetProps, OmittedTrueSheetProps> {
+  id?: BottomSheetProps<Id>["id"];
+  children: React.ReactNode;
+  hardwareBackPressToClose?: BottomSheetProps<Id>["hardwareBackPressToClose"];
+  onClose?: BottomSheetProps<Id>["onClose"];
+  onBeforeShow?: BottomSheetProps<Id>["onBeforeShow"];
+  opacity?: BottomSheetProps<Id>["opacity"];
+  stackBehavior?: BottomSheetProps<Id>["stackBehavior"];
+  iosModalSheetTypeOfAnimation?: BottomSheetProps<Id>["iosModalSheetTypeOfAnimation"];
+  closeAnimationConfigs?: BottomSheetProps<Id>["closeAnimationConfigs"];
+  style?: StyleProp<ViewStyle>;
 }
 
-const FULL_SCREEN_POINTS: (string | number)[] =
-  Platform.OS === "ios" ? ["%90", "90%"] : ["%93", "93%"];
+interface BottomSheetFC
+  extends React.MemoExoticComponent<
+    React.ForwardRefExoticComponent<TrueSheetComponentProps>
+  > {
+  <Id extends SheetIds>(
+    props: TrueSheetComponentProps<Id> & React.RefAttributes<BottomSheetInstance<Id>>,
+  ): React.JSX.Element;
+}
 
-const DEFAULT_SHEET_CLOSE_ANIMATION: WithTimingConfig = {
-  duration: 300,
-  easing: Easing.out(Easing.cubic),
-};
+const FULL_SCREEN_DETENT = 0.9;
 
 const useSheetManager = ({
   id,
@@ -113,7 +106,10 @@ const useSheetManager = ({
   }, [id, onHide, onBeforeShow, onContextUpdate, currentContext]);
 };
 
-const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetProps>(
+const BottomSheetComponent = React.forwardRef<
+  BottomSheetInstance,
+  TrueSheetComponentProps
+>(
   (
     {
       children,
@@ -121,24 +117,18 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
       onBeforeShow,
       stackBehavior = "switch",
       hardwareBackPressToClose = true,
-      enableDynamicSizing = false,
-      iosModalSheetTypeOfAnimation,
-      snapPoints: defaultSnapPoints,
-      animatedIndex: defaultAnimatedIndex,
-      onAnimate,
-      style,
-      passThrough,
+      detents: defaultDetents,
+      dimmed = true,
       opacity,
+      iosModalSheetTypeOfAnimation,
       closeAnimationConfigs,
+      style,
       ...props
     },
     ref,
   ) => {
     const currentSheetRef = useSheetRef();
     const currentCtx = useProviderContext();
-    const stackContext = useStackBehaviorContext();
-
-    const animatedIndex = useSharedValue(0);
 
     const [currentStackBehavior, setCurrentStackBehavior] =
       React.useState<StackBehavior>(stackBehavior);
@@ -147,39 +137,25 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
     const { bottom } = useSafeAreaInsets();
     const defaultStyle = React.useMemo(() => ({ paddingBottom: bottom }), [bottom]);
 
-    const effectiveCloseAnimation = React.useMemo(
-      () => closeAnimationConfigs ?? DEFAULT_SHEET_CLOSE_ANIMATION,
-      [closeAnimationConfigs],
-    );
-
     const { fullScreenValues } = useSheetSharedContext();
-    const [snapPoints, fullScreenIndex] = React.useMemo(() => {
-      let resolved = defaultSnapPoints;
-
-      if (
-        Platform.OS === "android" &&
-        iosModalSheetTypeOfAnimation &&
-        Array.isArray(resolved)
-      ) {
-        resolved = resolved.map((p) => (p === "90%" || p === "%90" ? "93%" : p));
-      }
-
-      const fullScreenIndex =
-        resolved instanceof Array
-          ? resolved.findIndex((p) => FULL_SCREEN_POINTS.includes(p))
-          : resolved?.value?.findIndex((p) => FULL_SCREEN_POINTS.includes(p)) || -1;
-
-      return [resolved, fullScreenIndex] as const;
-    }, [defaultSnapPoints, iosModalSheetTypeOfAnimation]);
+    const [detents, fullScreenIndex] = React.useMemo(() => {
+      const resolved = defaultDetents ?? [0.5, 1];
+      const fullScreenIdx = resolved.findIndex(
+        (p) => p === FULL_SCREEN_DETENT || p === 1,
+      );
+      return [resolved, fullScreenIdx] as const;
+    }, [defaultDetents]);
 
     const valueRef = React.useRef<unknown>(null);
-    const bottomSheetRef = React.useRef<BottomSheetModal>(null);
+    const trueSheetRef = React.useRef<TrueSheet>(null);
     const hardwareBackPressEvent = React.useRef<NativeEventSubscription>(
       null,
     ) as React.MutableRefObject<NativeEventSubscription>;
-    const teardownDataRef = React.useRef<{ dismiss?: boolean; behavior?: StackBehavior }>(
-      {},
-    );
+    const teardownDataRef = React.useRef<{
+      dismiss?: boolean;
+      behavior?: StackBehavior;
+    }>({});
+    const hasPresentedRef = React.useRef(false);
 
     const id = useSheetIDContext();
     const sheetId = props.id || id;
@@ -196,9 +172,6 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
     useSheetManager({
       id: sheetId,
       onHide: (data, dismiss, behavior) => {
-        // Update state for future renders, but also pass behavior directly
-        // so hideSheet doesn't read a stale closure value (React state update
-        // is async — hideSheet runs before the re-render).
         if (behavior) setCurrentStackBehavior(behavior);
         hideSheetRef.current(data, true, dismiss, behavior);
       },
@@ -218,27 +191,25 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
       },
     });
 
-    useAnimatedReaction(
-      () => animatedIndex.value,
-      (index) => {
-        "worklet";
-        if (defaultAnimatedIndex) {
-          defaultAnimatedIndex.set(index);
-        }
+    const handlePositionChange = React.useCallback(
+      (event: PositionChangeEvent) => {
+        const { index, detent: detentValue } = event.nativeEvent;
 
         if (iosModalSheetTypeOfAnimation && sheetId) {
-          const val = interpolate(
-            index,
-            [fullScreenIndex - 0.5, fullScreenIndex, fullScreenIndex + 1],
-            [0, 1, 0],
-            "clamp",
-          );
+          const fullScreenIdx = fullScreenIndex >= 0 ? fullScreenIndex : 1;
+          const base =
+            fullScreenIndex >= 0
+              ? index / fullScreenIdx
+              : detentValue >= FULL_SCREEN_DETENT
+                ? 1
+                : 0;
+          const val = interpolate(base, [0.8, 1, 1.2], [0, 1, 0], "clamp");
           const current = { ...fullScreenValues.value };
           current[sheetId] = val;
           fullScreenValues.set(current);
         }
       },
-      [iosModalSheetTypeOfAnimation, sheetId],
+      [iosModalSheetTypeOfAnimation, sheetId, fullScreenIndex, fullScreenValues],
     );
 
     React.useEffect(() => {
@@ -268,7 +239,6 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
 
         if (shouldRestorePrevious) {
           if (dismiss) {
-            // it will surface naturally when the push sheet is closed.
             if (behavior !== "push") {
               PrivateManager.history.push({
                 id: sheetId,
@@ -305,9 +275,6 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
         dismiss?: boolean,
         incomingBehavior?: StackBehavior,
       ) => {
-        // Use the freshly-delivered behavior from the event when available.
-        // currentStackBehavior comes from React state which may not have flushed
-        // yet when this callback fires synchronously from the manager.
         const activeBehavior = incomingBehavior ?? currentStackBehavior;
 
         let value = data ?? valueRef.current;
@@ -315,8 +282,6 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
         hardwareBackPressEvent.current?.remove();
 
         if (dismiss && activeBehavior === "push") {
-          // For push behavior, a "dismiss" event means another sheet wants to
-          // appear on top — do not close this sheet.
           if (fromManager) valueRef.current = data;
           return;
         }
@@ -326,7 +291,7 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
         if (fromManager && shouldClose) {
           valueRef.current = value;
           teardownDataRef.current = { dismiss, behavior: activeBehavior };
-          bottomSheetRef.current?.close(effectiveCloseAnimation);
+          trueSheetRef.current?.dismiss();
           return;
         }
 
@@ -340,62 +305,102 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
         const closeValue = onClose?.(value as never);
         if (closeValue !== undefined) value = closeValue;
 
-        if (shouldClose) {
-          bottomSheetRef.current?.close(effectiveCloseAnimation);
-        }
-
         teardownSheet(value, finalDismiss, finalBehavior);
-
         if (fromManager) valueRef.current = data;
       },
-      [currentStackBehavior, effectiveCloseAnimation, onClose, teardownSheet],
+      [currentStackBehavior, onClose, teardownSheet],
     );
 
     React.useEffect(() => {
       hideSheetRef.current = hideSheet;
     }, [hideSheet]);
 
+    const handleDidDismiss = React.useCallback(() => {
+      hideSheetRef.current();
+    }, []);
+
+    const handleBackPress = React.useCallback(() => {
+      hideSheetRef.current(undefined, true, false);
+      return true;
+    }, []);
+
+    const detectCount = React.useMemo(() => Math.min(detents?.length ?? 2, 3), [detents]);
+
     const getInstance = React.useCallback(
       (): BottomSheetInstance => ({
         close(options = {}): void {
           valueRef.current = (options as Record<string, unknown>).value;
-          const opts = options as {
-            animationConfigs?: WithSpringConfig | WithTimingConfig;
-          };
-          bottomSheetRef.current?.close(
-            opts.animationConfigs ?? effectiveCloseAnimation,
-          );
+          // Ignore animationConfigs — TrueSheet dismiss only supports animated boolean
+          trueSheetRef.current?.dismiss();
         },
-        expand(animationConfigs): void {
-          bottomSheetRef.current?.expand(animationConfigs);
+        expand(): void {
+          trueSheetRef.current?.resize(detectCount - 1);
         },
-        collapse(animationConfigs): void {
-          bottomSheetRef.current?.collapse(animationConfigs);
+        collapse(): void {
+          trueSheetRef.current?.resize(0);
         },
-        snapToIndex(index: number, animationConfigs): void {
-          bottomSheetRef.current?.snapToIndex(index, animationConfigs);
+        snapToIndex(index: number): void {
+          if (index >= 0 && index < detectCount) {
+            trueSheetRef.current?.resize(index);
+          }
         },
-        snapToPosition(position, animationConfigs): void {
-          bottomSheetRef.current?.snapToPosition(position, animationConfigs);
+        snapToPosition(position): void {
+          const numeric =
+            typeof position === "string"
+              ? parseFloat(position) / 100
+              : typeof position === "number"
+                ? position
+                : 0;
+          let closestIndex = 0;
+          let minDiff = Infinity;
+          for (let i = 0; i < detectCount; i++) {
+            const d = detents[i];
+            if (typeof d === "number") {
+              const diff = Math.abs(d - numeric);
+              if (diff < minDiff) {
+                minDiff = diff;
+                closestIndex = i;
+              }
+            }
+          }
+          trueSheetRef.current?.resize(closestIndex);
         },
       }),
-      [effectiveCloseAnimation],
+      [detectCount, detents],
     );
+
+    const presentSheet = React.useCallback(async () => {
+      if (hasPresentedRef.current) return;
+      hasPresentedRef.current = true;
+      await trueSheetRef.current?.present(0);
+    }, []);
 
     React.useEffect(() => {
       if (sheetId) {
-        PrivateManager.registerRef(sheetId, currentCtx, { current: getInstance() });
+        PrivateManager.registerRef(sheetId, currentCtx, {
+          current: getInstance(),
+        });
       }
       currentSheetRef.current = getInstance();
     }, [currentCtx, getInstance, sheetId, currentSheetRef]);
 
     React.useEffect(() => {
-      if (Platform.OS === "android" && hardwareBackPressToClose) {
+      presentSheet();
+
+      return () => {
+        hasPresentedRef.current = false;
+      };
+    }, [presentSheet]);
+
+    React.useEffect(() => {
+      if (
+        Platform.OS === "android" &&
+        hardwareBackPressToClose &&
+        !trueSheetRef.current
+      ) {
         hardwareBackPressEvent.current = BackHandler.addEventListener(
           "hardwareBackPress",
           () => {
-            // Go through hideSheet so internal state (PrivateManager, events,
-            // history) is updated correctly — not just the visual sheet.
             hideSheetRef.current(undefined, true, false);
             return true;
           },
@@ -412,38 +417,21 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
       [sheetId, isPushed, currentCtx],
     );
 
-    const backdropOpacity = React.useMemo(() => {
-      if (isPushed && stackContext.previousSheetId) {
-        return (opacity || 0.45) * 0.6;
-      }
-      return opacity || 0.45;
-    }, [isPushed, stackContext.previousSheetId, opacity]);
-
     return (
       <View pointerEvents="box-none" style={[StyleSheet.absoluteFill, { zIndex }]}>
-        <RNBottomSheet
-          enableDynamicSizing={enableDynamicSizing}
-          backdropComponent={(backdropProps) => (
-            <BottomSheetBackdrop
-              enableTouchThrough={!!passThrough}
-              opacity={backdropOpacity}
-              disappearsOnIndex={-1}
-              appearsOnIndex={0}
-              {...backdropProps}
-            />
-          )}
-          topInset={0}
-          bottomInset={0}
+        <TrueSheet
           {...props}
-          ref={bottomSheetRef}
-          onClose={hideSheet}
-          onAnimate={onAnimate}
-          animatedIndex={animatedIndex}
+          ref={trueSheetRef}
+          name={sheetId}
+          detents={detents}
+          dimmed={dimmed}
           style={[defaultStyle, style]}
-          snapPoints={enableDynamicSizing ? undefined : snapPoints}
+          onDidDismiss={handleDidDismiss}
+          onBackPress={handleBackPress}
+          onPositionChange={handlePositionChange}
         >
           {children}
-        </RNBottomSheet>
+        </TrueSheet>
       </View>
     );
   },
@@ -451,16 +439,5 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
 
 const BottomSheet = React.memo(BottomSheetComponent) as BottomSheetFC;
 BottomSheet.displayName = "BottomSheet";
-
-BottomSheet.View = BottomSheetView;
-BottomSheet.ScrollView = BottomSheetScrollView;
-BottomSheet.FlatList = BottomSheetFlatList;
-BottomSheet.SectionList = BottomSheetSectionList;
-BottomSheet.VirtualizedList = BottomSheetVirtualizedList;
-BottomSheet.Handle = BottomSheetHandle;
-BottomSheet.Footer = BottomSheetFooter;
-BottomSheet.FooterContainer = BottomSheetFooterContainer;
-BottomSheet.Backdrop = BottomSheetBackdrop;
-BottomSheet.TextInput = BottomSheetTextInput;
 
 export default BottomSheet;

@@ -11,7 +11,7 @@ import type {
 } from "./types";
 import { BottomSheetInstance, BottomSheetProps } from "../types";
 import { BottomSheetActions } from "./router";
-import BottomSheet from "../sheet";
+import BottomSheet from "../sheets/gorhom";
 
 type Props = {
   state: BottomSheetNavigationState<ParamListBase>;

@@ -11,6 +11,10 @@ import PushDemo2Sheet from "./modals/PushDemo2Sheet";
 import PushDemo1Sheet from "./modals/PushDemo1Sheet";
 import IOSModalSheet from "./modals/iOSModalSheet";
 import ExampleSheet from "./modals/ExampleSheet";
+import TrueSheetBasic from "./modals/truesheet/Basic";
+import TrueSheetHeaderFooter from "./modals/truesheet/HeaderFooter";
+import TrueSheetSwitch from "./modals/truesheet/Switch";
+import TrueSheetPush from "./modals/truesheet/Push";
 
 // Register all sheets with the SheetProvider
 registerSheet("example-sheet", ExampleSheet);
@@ -32,6 +36,14 @@ registerSheet("push-demo-3", PushDemo3Sheet);
 
 registerSheet("ios-modal", IOSModalSheet);
 
+// TrueSheet demos
+registerSheet("truesheet-basic", TrueSheetBasic);
+registerSheet("truesheet-header-footer", TrueSheetHeaderFooter);
+registerSheet("truesheet-switch", TrueSheetSwitch);
+registerSheet("truesheet-switch-2", TrueSheetSwitch);
+registerSheet("truesheet-push", TrueSheetPush);
+registerSheet("truesheet-push-2", TrueSheetPush);
+
 // We extend some of the types here to give us great intellisense
 // across the app for all registered sheets.
 declare module "@niibase/bottom-sheet-manager" {
@@ -51,6 +63,13 @@ declare module "@niibase/bottom-sheet-manager" {
         "push-demo-3": SheetDefinition;
         // Other demos
         "ios-modal": SheetDefinition;
+        // TrueSheet demos
+        "truesheet-basic": SheetDefinition;
+        "truesheet-header-footer": SheetDefinition;
+        "truesheet-switch": SheetDefinition;
+        "truesheet-switch-2": SheetDefinition;
+        "truesheet-push": SheetDefinition;
+        "truesheet-push-2": SheetDefinition;
     }
 }
 

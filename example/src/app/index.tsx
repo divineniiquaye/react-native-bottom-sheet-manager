@@ -2,6 +2,7 @@ import {
   ArrowRight,
   Compass,
   Layers,
+  Layout,
   Maximize2,
   Music,
   RefreshCw,
@@ -132,6 +133,59 @@ export default function HomeScreen() {
               </Text>
             </View>
             <Maximize2 size={20} color="#64748B" />
+          </Pressable>
+        </View>
+
+        {/* TrueSheet Demos */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>TrueSheet (Native)</Text>
+
+          <Pressable
+            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+            onPress={() => SheetManager.show("truesheet-basic")}
+          >
+            <View style={[styles.cardIcon, { backgroundColor: "#EDE9FE" }]}>
+              <Sparkles size={24} color="#8B5CF6" />
+            </View>
+            <View style={styles.cardContent}>
+              <Text style={styles.cardTitle}>TrueSheet Basic</Text>
+              <Text style={styles.cardDescription}>
+                Native detents, scrollable, grabber, expand/collapse
+              </Text>
+            </View>
+            <ArrowRight size={20} color="#94A3B8" />
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+            onPress={() => SheetManager.show("truesheet-header-footer")}
+          >
+            <View style={[styles.cardIcon, { backgroundColor: "#D1FAE5" }]}>
+              <Layout size={24} color="#10B981" />
+            </View>
+            <View style={styles.cardContent}>
+              <Text style={styles.cardTitle}>Header & Footer</Text>
+              <Text style={styles.cardDescription}>
+                Fixed header, floating footer, native scrollable
+              </Text>
+            </View>
+            <ArrowRight size={20} color="#94A3B8" />
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+            onPress={() => SheetManager.show("truesheet-switch")}
+          >
+            <View style={[styles.cardIcon, { backgroundColor: "#DBEAFE" }]}>
+              <ArrowRight size={24} color="#3B82F6" />
+            </View>
+            <View style={styles.cardContent}>
+              <Text style={styles.cardTitle}>Stack: Switch & Push</Text>
+              <Text style={styles.cardDescription}>
+                Switch and push behaviors with native TrueSheet
+              </Text>
+            </View>
+            <ArrowRight size={20} color="#94A3B8" />
           </Pressable>
         </View>
 

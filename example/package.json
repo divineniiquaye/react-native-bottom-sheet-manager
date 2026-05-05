@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@gorhom/bottom-sheet": "^5.2.13",
+    "@lodev09/react-native-true-sheet": "^3.10.1",
     "@react-navigation/native": "^7.1.9",
     "expo": "~54.0.21",
     "expo-linking": "~8.0.8",

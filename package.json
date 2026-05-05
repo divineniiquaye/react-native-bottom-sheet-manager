@@ -75,6 +75,7 @@
   },
   "dependencies": {
     "@gorhom/bottom-sheet": "^5.2.13",
+    "@lodev09/react-native-true-sheet": "^3.10.1",
     "nanoid": "^5.1.6"
   },
   "devDependencies": {
