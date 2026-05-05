@@ -156,6 +156,7 @@ const BottomSheetComponent = React.forwardRef<
       behavior?: StackBehavior;
     }>({});
     const hasPresentedRef = React.useRef(false);
+    const isDismissingRef = React.useRef(false);
 
     const id = useSheetIDContext();
     const sheetId = props.id || id;
@@ -289,6 +290,8 @@ const BottomSheetComponent = React.forwardRef<
         const shouldClose = activeBehavior !== "replace" || !dismiss;
 
         if (fromManager && shouldClose) {
+          if (isDismissingRef.current) return;
+          isDismissingRef.current = true;
           valueRef.current = value;
           teardownDataRef.current = { dismiss, behavior: activeBehavior };
           trueSheetRef.current?.dismiss();
@@ -306,6 +309,7 @@ const BottomSheetComponent = React.forwardRef<
         if (closeValue !== undefined) value = closeValue;
 
         teardownSheet(value, finalDismiss, finalBehavior);
+        isDismissingRef.current = false;
         if (fromManager) valueRef.current = data;
       },
       [currentStackBehavior, onClose, teardownSheet],

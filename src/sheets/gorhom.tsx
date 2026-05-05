@@ -180,6 +180,7 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
     const teardownDataRef = React.useRef<{ dismiss?: boolean; behavior?: StackBehavior }>(
       {},
     );
+    const isClosingRef = React.useRef(false);
 
     const id = useSheetIDContext();
     const sheetId = props.id || id;
@@ -324,6 +325,8 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
         const shouldClose = activeBehavior !== "replace" || !dismiss;
 
         if (fromManager && shouldClose) {
+          if (isClosingRef.current) return;
+          isClosingRef.current = true;
           valueRef.current = value;
           teardownDataRef.current = { dismiss, behavior: activeBehavior };
           bottomSheetRef.current?.close(effectiveCloseAnimation);
@@ -341,6 +344,7 @@ const BottomSheetComponent = React.forwardRef<BottomSheetInstance, BottomSheetPr
         if (closeValue !== undefined) value = closeValue;
 
         teardownSheet(value, finalDismiss, finalBehavior);
+        isClosingRef.current = false;
         if (fromManager) valueRef.current = data;
       },
       [currentStackBehavior, effectiveCloseAnimation, onClose, teardownSheet],
