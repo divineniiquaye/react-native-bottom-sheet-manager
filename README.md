@@ -6,7 +6,7 @@ A powerful bottom sheet manager and router for React Native, inspired by [react-
 
 - 🎯 **Simple API** - Show/hide sheets from anywhere in your app
 - 🔄 **Stack Behaviors** - Control how sheets stack with `push`, `switch`, or `replace` behaviors
-- 🧭 **React Navigation Integration** - Full support for React Navigation v6/v7 and Expo Router
+- 🧭 **React Navigation Integration** - Full support for React Navigation v7 and Expo Router
 - 📱 **iOS 18 Modal Animation** - Native-like modal sheet animations
 - 🎨 **TypeScript Support** - Full type safety with IntelliSense
 - ⚡ **Performance Optimized** - High-performance event system with O(1) lookups
@@ -166,7 +166,7 @@ Control how sheets behave when opened on top of existing sheets:
 
 ## React Navigation Integration
 
-Full support for React Navigation v6/v7 and Expo Router. The first screen in the navigator is rendered as main content, and subsequent screens are rendered as bottom sheet modals.
+Full support for React Navigation v7 and Expo Router. The first screen in the navigator is rendered as main content, and subsequent screens are rendered as bottom sheet modals.
 
 ### With Expo Router
 
@@ -177,7 +177,7 @@ import {
     BottomSheetNavigationOptions,
     BottomSheetNavigationState,
     createBottomSheetNavigator,
-} from "@niibase/bottom-sheet-manager";
+} from "@niibase/bottom-sheet-manager/navigation";
 
 const { Navigator } = createBottomSheetNavigator();
 const BottomSheet = withLayoutContext<
@@ -198,10 +198,12 @@ export default function Layout() {
     return (
         <BottomSheet
             screenOptions={{
-                snapPoints: ["50%", "90%"],
                 // See: https://gorhom.github.io/react-native-bottom-sheet/modal/props/
             }}
-        />
+        >
+            <BottomSheet.Screen name="index" />
+            <BottomSheet.Screen name="details" options={{ snapPoints: ["50%"] }} />
+        </BottomSheet>
     );
 }
 ```
@@ -209,7 +211,7 @@ export default function Layout() {
 ### With React Navigation
 
 ```tsx
-import { createBottomSheetNavigator } from "@niibase/bottom-sheet-manager";
+import { createBottomSheetNavigator } from "@niibase/bottom-sheet-manager/navigation";
 
 const { Navigator, Screen } = createBottomSheetNavigator();
 
@@ -235,7 +237,7 @@ function App() {
 Use the navigation object to control sheets programmatically:
 
 ```tsx
-import { useBottomSheetNavigation } from "@niibase/bottom-sheet-manager";
+import { useBottomSheetNavigation } from "@niibase/bottom-sheet-manager/navigation";
 
 function MySheet() {
     const navigation = useBottomSheetNavigation();
@@ -266,7 +268,7 @@ function MySheet() {
 Access navigation helpers including `snapTo()` and `dismiss()`:
 
 ```tsx
-import { useBottomSheetNavigation } from "@niibase/bottom-sheet-manager";
+import { useBottomSheetNavigation } from "@niibase/bottom-sheet-manager/navigation";
 
 const navigation = useBottomSheetNavigation();
 navigation.snapTo(1);
@@ -463,19 +465,6 @@ Enable native-like iOS 18 modal sheet animations:
 </BottomSheet>
 ```
 
-Or in navigation options:
-
-```tsx
-<Screen
-    name="Details"
-    component={DetailsSheet}
-    options={{
-        iosModalSheetTypeOfAnimation: true,
-        snapPoints: ["50%", "90%", "100%"],
-    }}
-/>
-```
-
 > **Note:** When `iosModalSheetTypeOfAnimation` is `false` (the default), no animated wrappers are added to the component tree, keeping your app's layout overhead minimal.
 >
 > **TrueSheet Android behavior:** When `iosModalSheetTypeOfAnimation` is `true`, Android normalizes full-screen detents so `1` maps to `0.9` (and `0.9` stays `0.9`) to keep modal-style animation behavior consistent.
@@ -666,7 +655,7 @@ Screen options for navigation-based sheets:
 ### Navigation Actions
 
 ```tsx
-import { BottomSheetActions } from "@niibase/bottom-sheet-manager";
+import { BottomSheetActions } from "@niibase/bottom-sheet-manager/navigation";
 
 // Snap to index
 navigation.dispatch(BottomSheetActions.snapTo(1));
