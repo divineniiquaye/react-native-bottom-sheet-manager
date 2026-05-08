@@ -2,11 +2,23 @@
   "name": "@niibase/bottom-sheet-manager",
   "version": "1.4.6",
   "description": "A bottom sheet manager for react-native based on @gorhom/bottom-sheet",
-  "main": "lib/commonjs/index",
-  "module": "lib/module/index",
-  "types": "lib/typescript/index.d.ts",
-  "react-native": "src/index.ts",
-  "source": "src/index.ts",
+  "source": "./src/index.ts",
+  "main": "./lib/commonjs/index.js",
+  "module": "./lib/module/index.js",
+  "types": "./lib/typescript/index.d.ts",
+  "exports": {
+    ".": {
+      "source": "src/index.ts",
+      "types": "./lib/typescript/index.d.ts",
+      "default": "./lib/module/index.js"
+    },
+    "./navigation": {
+      "source": "./src/navigation/index.tsx",
+      "types": "./lib/typescript/navigation/index.d.ts",
+      "default": "./lib/module/navigation/index.js"
+    },
+    "./package.json": "./package.json"
+  },
   "scripts": {
     "typescript": "tsc --skipLibCheck --noEmit",
     "lint": "prettier --check \"src/**/*\" \"example/**/*\"",
