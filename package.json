@@ -49,7 +49,7 @@
     "LICENSE"
   ],
   "peerDependencies": {
-    "@react-navigation/native": ">=7.1.8",
+    "@react-navigation/native": ">=7",
     "@types/react": "*",
     "@types/react-native": "*",
     "react": "*",
