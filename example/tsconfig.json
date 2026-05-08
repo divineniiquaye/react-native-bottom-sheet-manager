@@ -4,6 +4,9 @@
     "paths": {
       "@niibase/bottom-sheet-manager": [
         "../src/index"
+      ],
+      "@niibase/bottom-sheet-manager/navigation": [
+        "../src/navigation"
       ]
     },
   },

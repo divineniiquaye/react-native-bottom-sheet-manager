@@ -6,7 +6,7 @@ import {
   BottomSheetNavigationOptions,
   BottomSheetNavigationState,
   createBottomSheetNavigator,
-} from "@niibase/bottom-sheet-manager";
+} from "@niibase/bottom-sheet-manager/navigation";
 
 const { Navigator } = createBottomSheetNavigator();
 
