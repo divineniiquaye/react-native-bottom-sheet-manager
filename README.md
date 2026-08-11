@@ -1,6 +1,6 @@
 # Bottom Sheet Router & Manager
 
-A powerful bottom sheet manager and router for React Native, inspired by [react-native-actions-sheet]([https://github.com/ammarahm-ed/@repo/bottom-sheet](https://github.com/ammarahm-ed/react-native-actions-sheet) and built on top of [@gorhom/bottom-sheet](https://github.com/gorhom/react-native-bottom-sheet) with optional support for [@lodev09/react-native-true-sheet](https://github.com/lodev09/react-native-true-sheet).
+A powerful bottom sheet manager and router for React Native, inspired by [react-native-actions-sheet](https://github.com/ammarahm-ed/react-native-actions-sheet) and built on top of [@gorhom/bottom-sheet](https://github.com/gorhom/react-native-bottom-sheet) with optional support for [@lodev09/react-native-true-sheet](https://github.com/lodev09/react-native-true-sheet).
 
 ## Features
 
